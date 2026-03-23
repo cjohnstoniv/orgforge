@@ -1308,7 +1308,10 @@ class Memory:
         # ── Linked postmortem events ──────────────────────────────────────────
         pm_filter: Dict[str, Any] = {
             "type": "postmortem_published",
-            "artifact_ids.ticket": ticket_id,
+            "$or": [
+                {"artifact_ids.ticket": ticket_id},
+                {"artifact_ids.jira": ticket_id},
+            ],
         }
         if iso:
             pm_filter["timestamp"] = {"$lte": iso}
@@ -1909,7 +1912,10 @@ class Memory:
         # ── Blocker events on this ticket ─────────────────────────────────────
         blocker_filter: Dict[str, Any] = {
             "type": "blocker_flagged",
-            "artifact_ids.ticket": ticket_id,
+            "$or": [
+                {"artifact_ids.ticket": ticket_id},
+                {"artifact_ids.jira": ticket_id},
+            ],
         }
         if iso:
             blocker_filter["timestamp"] = {"$lte": iso}
@@ -1932,7 +1938,10 @@ class Memory:
         # Surfaces what has already been decided so participants don't rehash it.
         discussion_filter: Dict[str, Any] = {
             "type": {"$in": ["async_question", "design_discussion"]},
-            "artifact_ids.ticket": ticket_id,
+            "$or": [
+                {"artifact_ids.ticket": ticket_id},
+                {"artifact_ids.jira": ticket_id},
+            ],
         }
         if iso:
             discussion_filter["timestamp"] = {"$lte": iso}
@@ -2028,7 +2037,10 @@ class Memory:
         # ── Blocker events on this ticket ─────────────────────────────────────────
         blocker_filter: Dict = {
             "type": "blocker_flagged",
-            "artifact_ids.ticket": ticket_id,
+            "$or": [
+                {"artifact_ids.ticket": ticket_id},
+                {"artifact_ids.jira": ticket_id},
+            ],
         }
         if iso:
             blocker_filter["timestamp"] = {"$lte": iso}
@@ -2052,7 +2064,10 @@ class Memory:
         # ── Incident origin — did an incident open this ticket? ───────────────────
         incident_filter: Dict = {
             "type": "incident_opened",
-            "artifact_ids.ticket": ticket_id,
+            "$or": [
+                {"artifact_ids.ticket": ticket_id},
+                {"artifact_ids.jira": ticket_id},
+            ],
         }
         if iso:
             incident_filter["timestamp"] = {"$lte": iso}
@@ -2072,7 +2087,10 @@ class Memory:
         progress_filter: Dict = {
             "type": "ticket_progress",
             "actors": assignee,
-            "artifact_ids.ticket": ticket_id,
+            "$or": [
+                {"artifact_ids.ticket": ticket_id},
+                {"artifact_ids.jira": ticket_id},
+            ],
         }
         if iso:
             progress_filter["timestamp"] = {"$lte": iso}
@@ -2240,7 +2258,8 @@ class Memory:
             "type": "design_discussion",
             "$or": [
                 {"facts.participants": {"$in": actors}},  # actor overlap
-                {"artifact_ids.ticket": ticket_id},  # direct ticket ref
+                {"artifact_ids.ticket": ticket_id},  # direct ticket ref (new key)
+                {"artifact_ids.jira": ticket_id},  # direct ticket ref (legacy key)
             ],
         }
         if iso:

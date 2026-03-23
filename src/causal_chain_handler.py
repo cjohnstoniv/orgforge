@@ -421,7 +421,7 @@ class RecurrenceDetector:
 
         logger.info(
             f"[causal_chain] Recurrence matched ({confidence}): "
-            f"{best['event'].artifact_ids.get('jira', '?')} "
+            f"{best['event'].artifact_ids.get('ticket', best['event'].artifact_ids.get('jira', '?'))} "
             f"(vector={best['vector_score']:.3f}, "
             f"text={best['text_score']:.3f}, "
             f"gap={current_day - best['event'].day}d)"
