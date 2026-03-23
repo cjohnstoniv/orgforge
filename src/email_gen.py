@@ -677,7 +677,7 @@ class EmailGen:
                 "  • Core hours: 10am–3pm in your local timezone\n"
                 "  • Monthly in-person anchor day (first Monday)\n"
                 "  • All-hands meetings: Tuesdays 2pm EST\n\n"
-                f"Full policy on the wiki. Please review and acknowledge by Friday.\n\n{hr_lead}"
+                f"Full policy on {WIKI_PLATFORM_NAME}. Please review and acknowledge by Friday.\n\n{hr_lead}"
             ),
         )
         console.print("    [green]✓[/green] HR emails written.")

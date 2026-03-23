@@ -2423,7 +2423,7 @@ class Flow(Flow[State]):
         for row in [
             (
                 f"{WIKI_PLATFORM_NAME} Pages",
-                str(self._mem._artifacts.count_documents({"type": "wiki"})),
+                str(self._mem._artifacts.count_documents({"type": {"$in": ["wiki", "confluence"]}})),
             ),
             (f"{TKT_PLATFORM_NAME} Tickets", str(self._mem._tickets.count_documents({}))),
             (f"{MSG_PLATFORM_NAME} Threads", str(self._mem._messaging.count_documents({}))),
@@ -2442,7 +2442,7 @@ class Flow(Flow[State]):
         _proj = {"_id": 0, "embedding": 0}
         snapshot = {
             "confluence_pages": list(
-                self._mem._artifacts.find({"type": "wiki"}, _proj)
+                self._mem._artifacts.find({"type": {"$in": ["wiki", "confluence"]}}, _proj)
             ),
             "jira_tickets": list(self._mem._tickets.find({}, {"_id": 0})),
             "slack_threads": list(self._mem._messaging.find({}, {"_id": 0})),

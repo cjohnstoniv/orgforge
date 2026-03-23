@@ -1307,7 +1307,7 @@ class Memory:
 
         # ── Linked postmortem events ──────────────────────────────────────────
         pm_filter: Dict[str, Any] = {
-            "type": "postmortem_published",
+            "type": "postmortem_created",
             "$or": [
                 {"artifact_ids.ticket": ticket_id},
                 {"artifact_ids.jira": ticket_id},
