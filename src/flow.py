@@ -1251,7 +1251,7 @@ class Flow(Flow[State]):
                     dept_tickets.append(ticket)
                     self._embed_and_count(
                         id=tid,
-                        type="jira",
+                        type="ticket",
                         title=ticket["title"],
                         content=json.dumps(ticket),
                         day=self.state.day,
@@ -1288,7 +1288,7 @@ class Flow(Flow[State]):
                     date=date_str,
                     timestamp=timestamp_str,
                     actors=[LEADS.get(ticket["dept"], attendees[0])],
-                    artifact_ids={"jira": ticket["id"]},
+                    artifact_ids={"ticket": ticket["id"]},
                     facts={
                         "sprint_number": sprint_num,
                         "sprint_theme": sprint_theme,
@@ -1309,7 +1309,7 @@ class Flow(Flow[State]):
                 date=date_str,
                 timestamp=timestamp_str,
                 actors=attendees,
-                artifact_ids={"jira_tickets": [t["id"] for t in all_new_tickets]},
+                artifact_ids={"tickets": [t["id"] for t in all_new_tickets]},
                 facts={
                     "sprint_number": sprint_num,
                     "sprint_theme": sprint_theme,
@@ -1455,7 +1455,7 @@ class Flow(Flow[State]):
                 day=self.state.day,
                 date=date_str,
                 actors=attendees,
-                artifact_ids={"slack_path": slack_path, "slack_thread": thread_id},
+                artifact_ids={"messaging_path": slack_path, "messaging_thread": thread_id},
                 facts={"attendee_count": len(messages)},
                 summary=f"Standup: {len(messages)} voices shared updates.",
                 tags=["standup"],
@@ -1583,7 +1583,7 @@ class Flow(Flow[State]):
 
         self._embed_and_count(
             id=conf_id,
-            type="confluence",
+            type="wiki",
             title=f"Retro Sprint #{sprint_num}",
             content=content,
             day=self.state.day,
@@ -1598,7 +1598,7 @@ class Flow(Flow[State]):
                 day=self.state.day,
                 date=date_str,
                 actors=attendees,
-                artifact_ids={"confluence": conf_id},
+                artifact_ids={"wiki": conf_id},
                 facts={
                     "sprint_number": sprint_num,
                     "system_health": self.state.system_health,
@@ -1732,7 +1732,7 @@ class Flow(Flow[State]):
         prior = self._recurrence_detector.find_prior_incident(
             root_cause, self.state.day, ticket_id
         )
-        recurrence_of = prior.artifact_ids.get("jira") if prior else None
+        recurrence_of = prior.artifact_ids.get("ticket", prior.artifact_ids.get("jira")) if prior else None
         recurrence_gap = (self.state.day - prior.day) if prior else None
         prior_postmortem = (
             self._recurrence_detector.find_postmortem_for_ticket(recurrence_of)
@@ -1827,7 +1827,7 @@ class Flow(Flow[State]):
                     e
                     for e in self._mem._event_log
                     if e.type == "incident_opened"
-                    and e.artifact_ids.get("jira") == _cursor
+                    and (e.artifact_ids.get("ticket") or e.artifact_ids.get("jira")) == _cursor
                     and e.facts.get("recurrence_of")
                 ),
                 None,
@@ -1889,7 +1889,7 @@ class Flow(Flow[State]):
 
         self._embed_and_count(
             id=ticket_id,
-            type="jira",
+            type="ticket",
             title=title,
             content=embed_content,
             day=self.state.day,
@@ -2138,7 +2138,7 @@ class Flow(Flow[State]):
                         day=self.state.day,
                         date=str(self.state.current_date.date()),
                         actors=[on_call, eng_peer],
-                        artifact_ids={"jira": inc.ticket_id, "pr": inc.pr_id or ""},
+                        artifact_ids={"ticket": inc.ticket_id, "pr": inc.pr_id or ""},
                         facts={
                             "root_cause": inc.root_cause,
                             "duration_days": inc.days_active,
@@ -2187,7 +2187,7 @@ class Flow(Flow[State]):
                     day=self.state.day,
                     date=str(self.state.current_date.date()),
                     actors=[on_call, eng_peer],
-                    artifact_ids={"confluence": conf_id, "jira": inc.ticket_id},
+                    artifact_ids={"wiki": conf_id, "ticket": inc.ticket_id},
                     facts={
                         "causal_chain": inc.causal_chain.snapshot(),
                         "root_cause": inc.root_cause,
@@ -2423,7 +2423,7 @@ class Flow(Flow[State]):
         for row in [
             (
                 f"{WIKI_PLATFORM_NAME} Pages",
-                str(self._mem._artifacts.count_documents({"type": "confluence"})),
+                str(self._mem._artifacts.count_documents({"type": "wiki"})),
             ),
             (f"{TKT_PLATFORM_NAME} Tickets", str(self._mem._tickets.count_documents({}))),
             (f"{MSG_PLATFORM_NAME} Threads", str(self._mem._messaging.count_documents({}))),
@@ -2442,7 +2442,7 @@ class Flow(Flow[State]):
         _proj = {"_id": 0, "embedding": 0}
         snapshot = {
             "confluence_pages": list(
-                self._mem._artifacts.find({"type": "confluence"}, _proj)
+                self._mem._artifacts.find({"type": "wiki"}, _proj)
             ),
             "jira_tickets": list(self._mem._tickets.find({}, {"_id": 0})),
             "slack_threads": list(self._mem._messaging.find({}, {"_id": 0})),
@@ -2602,9 +2602,9 @@ class Flow(Flow[State]):
                 date=date_str,
                 actors=[liaison_name, external_node],
                 artifact_ids={
-                    "slack_thread": thread_id,
-                    "slack_path": slack_path,
-                    "jira": inc.ticket_id,
+                    "messaging_thread": thread_id,
+                    "messaging_path": slack_path,
+                    "ticket": inc.ticket_id,
                 },
                 facts={
                     "external_party": display_name,

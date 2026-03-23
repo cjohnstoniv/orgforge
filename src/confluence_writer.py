@@ -193,7 +193,7 @@ class ConfluenceWriter:
                 Crew(agents=[historian], tasks=[task], verbose=False).kickoff()
             ).strip()
 
-            resolved_tags = tags or ["genesis", "confluence"]
+            resolved_tags = tags or ["genesis", "wiki"]
 
             conf_ids = self._finalise_page(
                 raw_content=raw,
@@ -295,9 +295,9 @@ class ConfluenceWriter:
             date_str=date_str,
             timestamp=timestamp,
             subdir="postmortems",
-            tags=["postmortem", "confluence"],
+            tags=["postmortem", "wiki"],
             facts={"root_cause": root_cause, "incident_id": incident_id},
-            extra_artifact_ids={"jira": incident_id},
+            extra_artifact_ids={"ticket": incident_id},
         )
         logger.info(f"    [green]📄 Postmortem:[/green] {conf_ids[0]}")
 
@@ -403,7 +403,7 @@ class ConfluenceWriter:
             date_str=date_str,
             timestamp=timestamp,
             subdir="design",
-            tags=["confluence", "design_doc"],
+            tags=["wiki", "design_doc"],
             facts={"title": f"Design: {topic[:80]}", "type": "design_doc"},
         )
 
@@ -424,7 +424,7 @@ class ConfluenceWriter:
                 date=date_str,
                 actors=participants,
                 artifact_ids={
-                    "confluence": conf_ids[0],
+                    "wiki": conf_ids[0],
                     "spawned_tickets": json.dumps(created_ticket_ids),
                 },
                 facts={
@@ -438,9 +438,9 @@ class ConfluenceWriter:
                     f"{len(created_ticket_ids)} ticket(s): {', '.join(created_ticket_ids)}"
                 ),
                 tags=[
-                    "confluence",
+                    "wiki",
                     "design_doc",
-                    "jira",
+                    "ticket",
                     "causal_chain",
                 ],  # ← add causal_chain
             )
@@ -639,7 +639,7 @@ class ConfluenceWriter:
             date_str=date_str,
             timestamp=timestamp,
             subdir="general",
-            tags=["confluence", "adhoc"],
+            tags=["wiki", "adhoc"],
             facts={"title": title, "adhoc": True},
         )
 
@@ -710,7 +710,7 @@ class ConfluenceWriter:
 
             self._mem.embed_artifact(
                 id=page.id,
-                type="confluence",
+                type="wiki",
                 title=page.title,
                 content=final_content,
                 day=self._state.day,
@@ -742,7 +742,7 @@ class ConfluenceWriter:
 
             logger.info(f"[finalise] page facts {page_facts}")
             logger.debug(f"[finalise] pre-artifact-ids page.id={page.id}")
-            artifact_ids = {"confluence": page.id}
+            artifact_ids = {"wiki": page.id}
             if extra_artifact_ids:
                 artifact_ids.update(extra_artifact_ids)
 
@@ -818,7 +818,7 @@ class ConfluenceWriter:
             self._save_json(f"{self._base}/{TKT_EXPORT_DIR}/{tid}.json", ticket)
             self._mem.embed_artifact(
                 id=tid,
-                type="jira",
+                type="ticket",
                 title=ticket["title"],
                 content=json.dumps(ticket),
                 day=self._state.day,

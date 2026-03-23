@@ -278,7 +278,7 @@ class EmailGen:
             return
 
         for inc in resolved[:MAX_INCIDENT_THREADS]:
-            ticket_id = inc["artifact_ids"].get("jira", "ORG-???")
+            ticket_id = inc["artifact_ids"].get("ticket", inc["artifact_ids"].get("jira", "ORG-???"))
             root_cause = inc["facts"].get("root_cause", "unknown root cause")
             pr_id = inc["facts"].get("pr_id", "N/A")
             duration = inc["facts"].get("duration_days", "?")
@@ -526,7 +526,7 @@ class EmailGen:
         gap_area = gap["facts"].get(
             "gap_area", [_CFG.get("legacy_system", {}).get("name", "legacy system")]
         )
-        ticket = gap["artifact_ids"].get("jira", "ORG-???")
+        ticket = gap["artifact_ids"].get("ticket", gap["artifact_ids"].get("jira", "ORG-???"))
         gap_date = gap.get("date", "2026-03-05")
 
         # Pull departed employee details from config for richer context
@@ -694,7 +694,7 @@ class EmailGen:
         sender = resolve_role("sprint_email_sender")
         for retro in retros:
             sprint_num = retro["facts"].get("sprint_number", 1)
-            conf_id = retro["artifact_ids"].get("confluence", "CONF-RETRO-???")
+            conf_id = retro["artifact_ids"].get("wiki", retro["artifact_ids"].get("confluence", "CONF-RETRO-???"))
             resolved = retro["facts"].get("resolved_incidents", [])
             retro_date = retro.get("date", "2026-03-06")
 

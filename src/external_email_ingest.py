@@ -493,7 +493,7 @@ class ExternalEmailIngestor:
                 date=date_str,
                 actors=[sales_lead, product_lead],
                 artifact_ids={
-                    "slack_thread": thread_id,
+                    "messaging_thread": thread_id,
                     "email": signal.embed_id,
                     "source_email": signal.embed_id,
                 },
@@ -556,7 +556,7 @@ class ExternalEmailIngestor:
         self._mem.upsert_ticket(ticket)
         self._mem.embed_artifact(
             id=ticket_id,
-            type="jira",
+            type="ticket",
             title=ticket["title"],
             content=json.dumps(ticket),
             day=state.day,
@@ -681,7 +681,7 @@ class ExternalEmailIngestor:
         self._mem.upsert_ticket(ticket)
         self._mem.embed_artifact(
             id=ticket_id,
-            type="jira",
+            type="ticket",
             title=ticket["title"],
             content=json.dumps(ticket),
             day=state.day,

@@ -495,7 +495,7 @@ class NormalDayHandler:
                     day=self._state.day,
                     date=date_str,
                     actors=[assignee],
-                    artifact_ids={"jira": ticket_id},
+                    artifact_ids={"ticket": ticket_id},
                     facts={"ticket_id": ticket_id, "comment": comment_text},
                     summary=f"{assignee} flagged a blocker on {ticket_id}.",
                     tags=["ticket", "blocker"],
@@ -583,7 +583,7 @@ class NormalDayHandler:
         )
         self._mem.embed_artifact(
             id=ticket_id,
-            type="jira",
+            type="ticket",
             title=ticket.get("title", ticket_id),
             content=ticket_body,
             day=self._state.day,
@@ -598,7 +598,7 @@ class NormalDayHandler:
         # Also embed the individual comment
         self._mem.embed_artifact(
             id=comment_id,
-            type="jira_comment",
+            type="ticket_comment",
             title=f"Comment on {ticket_id}",
             content=comment_text,
             day=self._state.day,
@@ -616,7 +616,7 @@ class NormalDayHandler:
             if spawned_pr_id:
                 active_inc.causal_chain.append(spawned_pr_id)
 
-        artifacts = {"jira": ticket_id, "jira_comment": comment_id}
+        artifacts = {"ticket": ticket_id, "ticket_comment": comment_id}
         if spawned_pr_id:
             artifacts["pr"] = spawned_pr_id
 
@@ -840,7 +840,7 @@ class NormalDayHandler:
 
         artifact_ids = {"pr": pr.get("pr_id", pr_id or "")}
         if reply_thread_id:
-            artifact_ids["slack_thread"] = reply_thread_id
+            artifact_ids["messaging_thread"] = reply_thread_id
 
         causal_facts: dict = {}
         active_inc = next(
@@ -858,7 +858,7 @@ class NormalDayHandler:
             prior = self._mem._events.find_one(
                 {
                     "type": "ticket_progress",
-                    "artifact_ids.jira": linked_ticket_id,
+                    "artifact_ids.ticket": linked_ticket_id,
                     "facts.causal_chain": {"$exists": True},
                 },
                 {"facts.causal_chain": 1, "_id": 0},
@@ -870,7 +870,7 @@ class NormalDayHandler:
                     ticket_chain.append(artifact_id)
             ticket_chain.append(pr.get("pr_id", pr_id or ""))
             causal_facts["causal_chain"] = ticket_chain.snapshot()
-            artifact_ids["jira"] = linked_ticket_id
+            artifact_ids["ticket"] = linked_ticket_id
 
         self._mem.log_event(
             SimEvent(
@@ -1026,7 +1026,7 @@ class NormalDayHandler:
 
         artifact_ids: dict = {"pr": pr_id}
         if reply_thread_id:
-            artifact_ids["slack_thread"] = reply_thread_id
+            artifact_ids["messaging_thread"] = reply_thread_id
 
         # Attach to the incident's causal chain if one is live
         linked_ticket_id = pr.get("linked_ticket") or pr.get("ticket_id", "")
@@ -1223,7 +1223,7 @@ class NormalDayHandler:
                 day=self._state.day,
                 date=date_str,
                 actors=[name, collaborator],
-                artifact_ids={"slack_path": slack_path, "slack_thread": thread_id},
+                artifact_ids={"messaging_path": slack_path, "messaging_thread": thread_id},
                 facts={
                     "participants": [name, collaborator],
                     "message_count": len(messages),
@@ -1437,9 +1437,9 @@ class NormalDayHandler:
                 date=date_str,
                 actors=all_actors,
                 artifact_ids={
-                    "slack": slack_path,
-                    "slack_thread": thread_id,
-                    "jira": ticket_id or "",
+                    "messaging": slack_path,
+                    "messaging_thread": thread_id,
+                    "ticket": ticket_id or "",
                 },
                 facts=facts,
                 summary=f"{asker} asked a question in #{channel} about {ticket_title[:50]}.",
@@ -1583,9 +1583,9 @@ class NormalDayHandler:
         }
 
         artifact_ids = {
-            "slack_path": slack_path,
-            "slack_thread": thread_id,
-            "confluence": conf_id or "",
+            "messaging_path": slack_path,
+            "messaging_thread": thread_id,
+            "wiki": conf_id or "",
         }
 
         related_ticket_id = item.related_id
@@ -1593,7 +1593,7 @@ class NormalDayHandler:
             prior = self._mem._events.find_one(
                 {
                     "type": "ticket_progress",
-                    "artifact_ids.jira": related_ticket_id,
+                    "artifact_ids.ticket": related_ticket_id,
                     "facts.causal_chain": {"$exists": True},
                 },
                 {"facts.causal_chain": 1, "_id": 0},
@@ -1607,7 +1607,7 @@ class NormalDayHandler:
             if conf_id:
                 ticket_chain.append(conf_id)
             facts["causal_chain"] = ticket_chain.snapshot()
-            artifact_ids["jira"] = related_ticket_id
+            artifact_ids["ticket"] = related_ticket_id
 
         self._mem.log_event(
             SimEvent(
@@ -1752,7 +1752,7 @@ class NormalDayHandler:
                 day=self._state.day,
                 date=date_str,
                 actors=[mentor, mentee],
-                artifact_ids={"slack_path": slack_path, "slack_thread": thread_id},
+                artifact_ids={"messaging_path": slack_path, "messaging_thread": thread_id},
                 facts={
                     "mentor": mentor,
                     "mentee": mentee,
@@ -1899,7 +1899,7 @@ class NormalDayHandler:
                 day=self._state.day,
                 date=date_str,
                 actors=participants,
-                artifact_ids={"slack_path": slack_path, "slack_thread": thread_id},
+                artifact_ids={"messaging_path": slack_path, "messaging_thread": thread_id},
                 facts={"tension": tension, "type": event.event_type},
                 summary=f"Unplanned {tension} interaction: {event.rationale}",
                 tags=["collision", tension],
@@ -2047,9 +2047,9 @@ class NormalDayHandler:
                     timestamp=timestamp,
                     actors=participants,
                     artifact_ids={
-                        "slack_path": slack_path,
-                        "slack_thread": thread_id,
-                        "jira": ticket_id,
+                        "messaging_path": slack_path,
+                        "messaging_thread": thread_id,
+                        "ticket": ticket_id,
                     },
                     facts=facts,
                     summary=f"{asker} is blocked on {ticket_id}, pinged {collaborator}.",
@@ -2131,7 +2131,7 @@ class NormalDayHandler:
                 day=self._state.day,
                 date=date_str,
                 actors=[name],
-                artifact_ids={"jira": item.related_id or ""},
+                artifact_ids={"ticket": item.related_id or ""},
                 facts={
                     "name": name,
                     "activity_type": item.activity_type,
@@ -2361,7 +2361,7 @@ class NormalDayHandler:
                     day=self._state.day,
                     date=date_str,
                     actors=participants,
-                    artifact_ids={"slack_thread": thread_id, "slack_path": slack_path},
+                    artifact_ids={"messaging_thread": thread_id, "messaging_path": slack_path},
                     facts={"topic": topic, "message_count": len(messages)},
                     summary=f"{target_actor} got distracted chatting about {topic} with {len(participants) - 1} others.",
                     tags=["watercooler", "messaging", "distraction"],
@@ -2472,7 +2472,7 @@ class NormalDayHandler:
 
             self._mem.embed_artifact(
                 id=thread_id,
-                type="slack_thread",
+                type="messaging_thread",
                 title=f"{interaction_type.replace('_', ' ').title()} in #{channel}",
                 content=full_transcript,
                 day=self._state.day,

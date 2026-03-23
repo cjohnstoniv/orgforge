@@ -207,7 +207,7 @@ class RecurrenceMatchStore:
             "current_day": current_day,
             # Match result
             "matched": matched_event is not None,
-            "matched_ticket_id": matched_event.artifact_ids.get("jira")
+            "matched_ticket_id": matched_event.artifact_ids.get("ticket", matched_event.artifact_ids.get("jira"))
             if matched_event
             else None,
             "matched_root_cause": matched_event.facts.get("root_cause")
@@ -312,7 +312,7 @@ class RecurrenceDetector:
         _TEXT_CEILING = 8.0
         for rank, result in enumerate(text_results):
             event = SimEvent.from_dict(result)
-            key = event.artifact_ids.get("jira", event.timestamp)
+            key = event.artifact_ids.get("ticket", event.artifact_ids.get("jira", event.timestamp))
             raw = result.get("score", 0)
             normalised = round(min(raw / _TEXT_CEILING, 1.0), 4)
             candidates.setdefault(key, self._empty_candidate(event))
@@ -323,7 +323,7 @@ class RecurrenceDetector:
         vector_results = self._vector_search(root_cause, current_day)
 
         for rank, (event, vscore) in enumerate(vector_results):
-            key = event.artifact_ids.get("jira", event.timestamp)
+            key = event.artifact_ids.get("ticket", event.artifact_ids.get("jira", event.timestamp))
             candidates.setdefault(key, self._empty_candidate(event))
             candidates[key]["vector_score"] = vscore
             candidates[key]["vector_rrf"] = 1 / (rank + 1 + _RRF_K)
@@ -439,11 +439,11 @@ class RecurrenceDetector:
                 e
                 for e in self._mem.get_event_log()
                 if e.type == "postmortem_created"
-                and e.artifact_ids.get("jira") == ticket_id
+                and (e.artifact_ids.get("ticket") or e.artifact_ids.get("jira")) == ticket_id
             ),
             None,
         )
-        return event.artifact_ids.get("confluence") if event else None
+        return event.artifact_ids.get("wiki", event.artifact_ids.get("confluence")) if event else None
 
     def get_causal_chain(self, artifact_id: str) -> List[SimEvent]:
         """

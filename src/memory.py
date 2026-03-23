@@ -423,7 +423,7 @@ class Memory:
         self._events.create_index([("type", 1), ("day", 1)])
         self._events.create_index([("type", 1), ("timestamp", -1)])
         self._events.create_index([("actors", 1), ("timestamp", -1)])
-        self._events.create_index([("type", 1), ("artifact_ids.jira", 1)])
+        self._events.create_index([("type", 1), ("artifact_ids.ticket", 1)])
         self._events.create_index([("tags", 1)])
         self._events.create_index([("type", 1), ("facts.participants", 1)])
         self._checkpoints.create_index([("day", -1)])
@@ -725,7 +725,7 @@ class Memory:
         results = self.recall(
             query=topic,
             n=n,
-            type_filter="confluence",
+            type_filter="wiki",
             as_of_time=as_of_time,
         )
 
@@ -1020,7 +1020,7 @@ class Memory:
                 or facts.get("title")
                 or facts.get("sprint_theme")
                 or facts.get("subject")
-                or artifact_ids.get("jira")
+                or artifact_ids.get("ticket", artifact_ids.get("jira"))
                 or ""
             )
 
@@ -1308,7 +1308,7 @@ class Memory:
         # ── Linked postmortem events ──────────────────────────────────────────
         pm_filter: Dict[str, Any] = {
             "type": "postmortem_published",
-            "artifact_ids.jira": ticket_id,
+            "artifact_ids.ticket": ticket_id,
         }
         if iso:
             pm_filter["timestamp"] = {"$lte": iso}
@@ -1909,7 +1909,7 @@ class Memory:
         # ── Blocker events on this ticket ─────────────────────────────────────
         blocker_filter: Dict[str, Any] = {
             "type": "blocker_flagged",
-            "artifact_ids.jira": ticket_id,
+            "artifact_ids.ticket": ticket_id,
         }
         if iso:
             blocker_filter["timestamp"] = {"$lte": iso}
@@ -1932,7 +1932,7 @@ class Memory:
         # Surfaces what has already been decided so participants don't rehash it.
         discussion_filter: Dict[str, Any] = {
             "type": {"$in": ["async_question", "design_discussion"]},
-            "artifact_ids.jira": ticket_id,
+            "artifact_ids.ticket": ticket_id,
         }
         if iso:
             discussion_filter["timestamp"] = {"$lte": iso}
@@ -2028,7 +2028,7 @@ class Memory:
         # ── Blocker events on this ticket ─────────────────────────────────────────
         blocker_filter: Dict = {
             "type": "blocker_flagged",
-            "artifact_ids.jira": ticket_id,
+            "artifact_ids.ticket": ticket_id,
         }
         if iso:
             blocker_filter["timestamp"] = {"$lte": iso}
@@ -2052,7 +2052,7 @@ class Memory:
         # ── Incident origin — did an incident open this ticket? ───────────────────
         incident_filter: Dict = {
             "type": "incident_opened",
-            "artifact_ids.jira": ticket_id,
+            "artifact_ids.ticket": ticket_id,
         }
         if iso:
             incident_filter["timestamp"] = {"$lte": iso}
@@ -2072,7 +2072,7 @@ class Memory:
         progress_filter: Dict = {
             "type": "ticket_progress",
             "actors": assignee,
-            "artifact_ids.jira": ticket_id,
+            "artifact_ids.ticket": ticket_id,
         }
         if iso:
             progress_filter["timestamp"] = {"$lte": iso}
@@ -2240,7 +2240,7 @@ class Memory:
             "type": "design_discussion",
             "$or": [
                 {"facts.participants": {"$in": actors}},  # actor overlap
-                {"artifact_ids.jira": ticket_id},  # direct ticket ref
+                {"artifact_ids.ticket": ticket_id},  # direct ticket ref
             ],
         }
         if iso:
@@ -2281,9 +2281,9 @@ class Memory:
                     "topic": d.get("facts", {}).get("topic", ""),
                     "participants": d.get("facts", {}).get("participants", []),
                     "slack_thread_id": d.get("artifact_ids", {}).get(
-                        "slack_thread", ""
+                        "messaging_thread", d.get("artifact_ids", {}).get("slack_thread", "")
                     ),
-                    "confluence_id": d.get("artifact_ids", {}).get("confluence", ""),
+                    "confluence_id": d.get("artifact_ids", {}).get("wiki", d.get("artifact_ids", {}).get("confluence", "")),
                 }
             )
         return results

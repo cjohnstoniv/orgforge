@@ -179,7 +179,7 @@ class ArtifactRegistry:
         try:
             # Seed Confluence (from artifacts collection)
             for doc in self._mem._artifacts.find(
-                {"type": "confluence"}, {"_id": 1, "title": 1}
+                {"type": {"$in": ["wiki", "confluence"]}}, {"_id": 1, "title": 1}
             ):
                 self._confluence[doc["_id"]] = doc.get("title", "")
 
