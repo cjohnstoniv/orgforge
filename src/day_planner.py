@@ -116,7 +116,7 @@ class DepartmentPlanner:
     - Examples by department:
         * Design     → design_discussion, confluence_page (design system docs, UX guidelines)
         * Sales      → async_question (pinging PM for roadmap), confluence_page (sales playbook)
-        * HR_Ops     → 1on1 (wellbeing check), confluence_page (onboarding guide, PTO policy)
+        * HR_Ops     → 1on1 (wellbeing check), confluence_page (onboarding guide, policy docs)
         * QA_Support → design_discussion (test plan), confluence_page (QA runbook)
 
     5. NO EVENT REDUNDANCY (CRITICAL TO AVOID DUPLICATES).
@@ -559,7 +559,7 @@ class DepartmentPlanner:
 
     def _open_tickets(self, state, mem: Memory) -> str:
         tickets = list(
-            mem._jira.find(
+            mem._tickets.find(
                 {
                     "assignee": {"$in": self.members},
                     "status": {"$ne": "Done"},
@@ -784,7 +784,7 @@ class OrgCoordinator:
                 "tension_level": "high | medium | low"
             }},
             "priority": "int — 1=must fire, 2=should fire, 3=optional",
-            "artifact_hint": "slack | email | confluence | jira"
+            "artifact_hint": "messaging | email | wiki | ticket"
         }}
     }}
 

@@ -4,7 +4,7 @@ org_lifecycle.py
 Dynamic hiring and firing for OrgForge.
 
 Principle: The Python engine controls all mutations to org state, the social
-graph, and the SimEvent log. LLMs only produce the *narrative prose* (Slack
+graph, and the SimEvent log. LLMs only produce the *narrative prose* (messaging
 announcements, onboarding docs, farewell messages). They never touch State.
 
 Three public entry points called from flow.py:
@@ -13,7 +13,7 @@ Three public entry points called from flow.py:
   OrgLifecycleManager.get_roster_context()   ← for DepartmentPlanner prompts
 
 Three departure side-effects handled deterministically (no LLM involvement):
-  1. JIRA ticket reassignment — orphaned tickets are reassigned to the dept
+  1. Ticket reassignment — orphaned tickets are reassigned to the dept
      lead and transitioned back to "To Do" so they stay in the sprint backlog.
   2. Centrality vacuum — after node removal the betweenness cache is dirtied
      and an immediate recomputation is triggered; the resulting centrality
@@ -55,6 +55,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 
 from agent_factory import make_agent
+from config_loader import TKT_PLATFORM_NAME, TKT_EXPORT_DIR, WIKI_PLATFORM_NAME
 from memory import Memory, SimEvent
 from graph_dynamics import GraphDynamics
 
@@ -262,7 +263,7 @@ class OrgLifecycleManager:
                         day=day,
                         date=date_str,
                         actors=[record.name],
-                        artifact_ids={"jira": triggered_by},
+                        artifact_ids={"ticket": triggered_by},
                         facts={
                             "departed_employee": record.name,
                             "gap_areas": [domain],
@@ -390,14 +391,14 @@ class OrgLifecycleManager:
 
         # Side-effects run in this exact order so each can still reference live graph:
         #   1. Incident handoff   — needs Dijkstra path through departing node
-        #   2. JIRA reassignment  — reads ticket assignees from state
+        #   2. Ticket reassignment — reads ticket assignees from state
         #   3. Remove node        — graph mutation
         #   4. Centrality vacuum  — diff before/after centrality, apply stress
 
         self._handoff_active_incidents(
             name, dept_lead, record, day, date_str, state, timestamp_iso
         )
-        self._reassign_jira_tickets(
+        self._reassign_tickets(
             name, dept_lead, record, day, date_str, state, timestamp_iso
         )
 
@@ -527,7 +528,7 @@ class OrgLifecycleManager:
                     day=day,
                     date=date_str,
                     actors=[name, new_owner],
-                    artifact_ids={"jira": inc.ticket_id},
+                    artifact_ids={"ticket": inc.ticket_id},
                     facts={
                         "trigger": "forced_handoff_on_departure",
                         "departed": name,
@@ -550,9 +551,9 @@ class OrgLifecycleManager:
                 f"(stage={inc.stage}) {name} → {new_owner}"
             )
 
-    # ── Side-effect 2: JIRA ticket reassignment ───────────────────────────────
+    # ── Side-effect 2: Ticket reassignment ────────────────────────────────────
 
-    def _reassign_jira_tickets(
+    def _reassign_tickets(
         self,
         name: str,
         dept_lead: str,
@@ -563,7 +564,7 @@ class OrgLifecycleManager:
         timestamp_iso,
     ) -> None:
         """
-        Reassign all non-Done JIRA tickets owned by the departing engineer.
+        Reassign all non-Done tickets owned by the departing engineer.
 
         Status logic:
           "To Do"        → stays "To Do", just new assignee
@@ -571,7 +572,7 @@ class OrgLifecycleManager:
           "In Progress"  with linked PR    → keep status; PR review/merge closes it
         """
         open_tickets = list(
-            self._mem._jira.find(
+            self._mem._tickets.find(
                 {
                     "assignee": name,
                     "status": {"$ne": "Done"},
@@ -596,7 +597,7 @@ class OrgLifecycleManager:
                 import json as _json
 
                 serialisable = {k: v for k, v in ticket.items() if k != "_id"}
-                path = f"{self._base}/jira/{ticket['id']}.json"
+                path = f"{self._base}/{TKT_EXPORT_DIR}/{ticket['id']}.json"
                 with open(path, "w") as f:
                     _json.dump(serialisable, f, indent=2)
 
@@ -609,7 +610,7 @@ class OrgLifecycleManager:
                     day=day,
                     date=date_str,
                     actors=[name, dept_lead],
-                    artifact_ids={"jira": ticket["id"]},
+                    artifact_ids={"ticket": ticket["id"]},
                     facts={
                         "ticket_id": ticket["id"],
                         "title": ticket.get("title", ""),

@@ -29,6 +29,12 @@ from rich.console import Console
 from langchain_community.llms import Ollama
 from crewai import Agent, Task, Crew
 
+from config_loader import (
+    MSG_PLATFORM_NAME,
+    TKT_PLATFORM_NAME,
+    WIKI_PLATFORM_NAME,
+)
+
 
 console = Console()
 
@@ -272,7 +278,7 @@ class EmailGen:
             return
 
         for inc in resolved[:MAX_INCIDENT_THREADS]:
-            ticket_id = inc["artifact_ids"].get("jira", "ORG-???")
+            ticket_id = inc["artifact_ids"].get("ticket", inc["artifact_ids"].get("jira", "ORG-???"))
             root_cause = inc["facts"].get("root_cause", "unknown root cause")
             pr_id = inc["facts"].get("pr_id", "N/A")
             duration = inc["facts"].get("duration_days", "?")
@@ -447,7 +453,7 @@ class EmailGen:
             inc_this_wk = [r for r in resolved if r.get("day", 0) <= week * 5]
             inc_summary = (
                 ", ".join(
-                    f"{r['artifact_ids'].get('jira', '?')} ({r['facts'].get('root_cause', '?')[:80]})"
+                    f"{r['artifact_ids'].get('ticket', r['artifact_ids'].get('jira', '?'))} ({r['facts'].get('root_cause', '?')[:80]})"
                     for r in inc_this_wk[-2:]
                 )
                 if inc_this_wk
@@ -520,7 +526,7 @@ class EmailGen:
         gap_area = gap["facts"].get(
             "gap_area", [_CFG.get("legacy_system", {}).get("name", "legacy system")]
         )
-        ticket = gap["artifact_ids"].get("jira", "ORG-???")
+        ticket = gap["artifact_ids"].get("ticket", gap["artifact_ids"].get("jira", "ORG-???"))
         gap_date = gap.get("date", "2026-03-05")
 
         # Pull departed employee details from config for richer context
@@ -575,7 +581,7 @@ class EmailGen:
                 "date": gap_date,
                 "body": _llm_body(
                     hr_lead,
-                    f"Propose a Confluence documentation template. Suggest reaching out to {departed_name} for a paid consulting session.",
+                    f"Propose a {WIKI_PLATFORM_NAME} documentation template. Suggest reaching out to {departed_name} for a paid consulting session.",
                     facts_str,
                 ),
             },
@@ -631,7 +637,7 @@ class EmailGen:
             body=(
                 f"Hi {new_hire},\n\nWe're so glad to have you on the {new_hire_dept} team!\n\n"
                 f"Your first week includes team introductions ({prod_lead} will set these up), "
-                f"JIRA and Confluence access (Tom will send credentials), and an engineering "
+                f"{TKT_PLATFORM_NAME} and {WIKI_PLATFORM_NAME} access (Tom will send credentials), and an engineering "
                 f"onboarding session with {on_call} on Thursday.\n\n"
                 f"One heads-up: our legacy system ({legacy_proj} / {legacy_name}) is in a transition phase. "
                 f"Don't be alarmed if you see incident tickets — we're actively stabilising it.\n\n"
@@ -671,14 +677,14 @@ class EmailGen:
                 "  • Core hours: 10am–3pm in your local timezone\n"
                 "  • Monthly in-person anchor day (first Monday)\n"
                 "  • All-hands meetings: Tuesdays 2pm EST\n\n"
-                f"Full policy on Confluence. Please review and acknowledge by Friday.\n\n{hr_lead}"
+                f"Full policy on {WIKI_PLATFORM_NAME}. Please review and acknowledge by Friday.\n\n{hr_lead}"
             ),
         )
         console.print("    [green]✓[/green] HR emails written.")
 
     # ── 6. RETROSPECTIVE SUMMARIES ─────────────
     def _retrospective_summaries(self):
-        """Post-retro summary emails to all leads, referencing the actual retro Confluence page."""
+        """Post-retro summary emails to all leads, referencing the actual retro wiki page."""
         console.print("  Generating retrospective summaries...")
         retros = self.log.retrospectives()
         if not retros:
@@ -688,7 +694,7 @@ class EmailGen:
         sender = resolve_role("sprint_email_sender")
         for retro in retros:
             sprint_num = retro["facts"].get("sprint_number", 1)
-            conf_id = retro["artifact_ids"].get("confluence", "CONF-RETRO-???")
+            conf_id = retro["artifact_ids"].get("wiki", retro["artifact_ids"].get("confluence", "CONF-RETRO-???"))
             resolved = retro["facts"].get("resolved_incidents", [])
             retro_date = retro.get("date", "2026-03-06")
 
@@ -700,7 +706,7 @@ class EmailGen:
             )
             body = _llm_body(
                 sender,
-                "Send a brief post-retro summary to all leads. Reference the Confluence page ID. "
+                f"Send a brief post-retro summary to all leads. Reference the {WIKI_PLATFORM_NAME} page ID. "
                 "List 2-3 key takeaways and thank the team.",
                 facts_str,
             )

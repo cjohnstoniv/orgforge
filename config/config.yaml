@@ -52,6 +52,28 @@ model_presets:
     embed_model: "mxbai-embed-large"
     embed_dims: 1024
 
+# ── PLATFORM ABSTRACTION ─────────────────────────────────────
+# Controls which enterprise platform names appear in LLM prompts,
+# output paths, MongoDB collection names, and SimEvent tags.
+# Change these to target a different platform stack (e.g. Slack/JIRA/Confluence).
+platform:
+  messaging:
+    name: "Slack"
+    dm_label: "Slack DM"
+    channel_label: "Slack channel"
+    thread_label: "Slack thread"
+    export_dir: "slack"
+    collection: "slack_messages"
+  tickets:
+    name: "JIRA"
+    id_prefix: "JIRA"
+    export_dir: "jira"
+    collection: "jira_tickets"
+  wiki:
+    name: "Confluence"
+    id_prefix: "CONF"
+    export_dir: "confluence"
+
 # ── SIMULATION ────────────────────────────────────────────────
 simulation:
   company_name: "Apex Athletics"

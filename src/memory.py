@@ -23,7 +23,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, asdict
 import time
-from typing import List, Dict, Optional, Any, Tuple
+from typing import List, Dict, Optional, Any, Tuple, Union
 
 from pymongo import MongoClient
 from pymongo.operations import SearchIndexModel
@@ -55,6 +55,12 @@ EMBED_DIMS = int(os.environ.get("EMBED_DIMS", "1024"))
 DEBUG_TOKEN_TRACKING = os.environ.get("DEBUG_TOKEN_TRACKING", "false").lower() == "true"
 
 _SKIP_EMBED_TYPES = {
+    "ticket_created",
+    "ticket_updated",
+    "wiki_page_created",
+    "messaging_thread_created",
+    "messaging_message_sent",
+    # Legacy aliases (keep for backward compat with existing DBs)
     "jira_ticket_created",
     "jira_ticket_updated",
     "confluence_page_created",
@@ -390,10 +396,17 @@ class Memory:
         self._token_usage = self._db["token_usage"] if self._debug_tokens else None
         self._artifacts = self._db["artifacts"]
         self._events = self._db["events"]
-        self._jira = self._db["jira_tickets"]
+        # Platform-aware collection names — driven by config.yaml platform section.
+        # Import here to avoid circular imports at module level.
+        from config_loader import MSG_COLLECTION, TKT_COLLECTION
+        self._tickets = self._db[TKT_COLLECTION]
         self._prs = self._db["pull_requests"]
         self._checkpoints = self._db["checkpoints"]
-        self._slack = self._db["slack_messages"]
+        self._messaging = self._db[MSG_COLLECTION]
+        # Backward-compat aliases so existing callers using self._jira / self._slack
+        # continue to work without changes.
+        self._jira = self._tickets
+        self._slack = self._messaging
         self._plans = self._db["dept_plans"]
         self._conversation_summaries = self._db["conversation_summaries"]
 
@@ -410,7 +423,7 @@ class Memory:
         self._events.create_index([("type", 1), ("day", 1)])
         self._events.create_index([("type", 1), ("timestamp", -1)])
         self._events.create_index([("actors", 1), ("timestamp", -1)])
-        self._events.create_index([("type", 1), ("artifact_ids.jira", 1)])
+        self._events.create_index([("type", 1), ("artifact_ids.ticket", 1)])
         self._events.create_index([("tags", 1)])
         self._events.create_index([("type", 1), ("facts.participants", 1)])
         self._checkpoints.create_index([("day", -1)])
@@ -575,7 +588,7 @@ class Memory:
         self,
         query: str,
         n: int = 5,
-        type_filter: Optional[str] = None,
+        type_filter: Optional[Union[str, List[str]]] = None,
         type_exclude: Optional[List[str]] = None,
         day_range: Optional[tuple] = None,
         since: Optional[Any] = None,
@@ -612,7 +625,10 @@ class Memory:
                 "recall(): type_filter and type_exclude are mutually exclusive"
             )
         if type_filter:
-            filter_doc["type"] = {"$eq": type_filter}
+            if isinstance(type_filter, list):
+                filter_doc["type"] = {"$in": type_filter}
+            else:
+                filter_doc["type"] = {"$eq": type_filter}
         if type_exclude:
             filter_doc["type"] = {"$nin": type_exclude}
         if day_range:
@@ -712,7 +728,7 @@ class Memory:
         results = self.recall(
             query=topic,
             n=n,
-            type_filter="confluence",
+            type_filter=["wiki", "confluence"],
             as_of_time=as_of_time,
         )
 
@@ -1007,7 +1023,7 @@ class Memory:
                 or facts.get("title")
                 or facts.get("sprint_theme")
                 or facts.get("subject")
-                or artifact_ids.get("jira")
+                or artifact_ids.get("ticket", artifact_ids.get("jira"))
                 or ""
             )
 
@@ -1294,8 +1310,11 @@ class Memory:
 
         # ── Linked postmortem events ──────────────────────────────────────────
         pm_filter: Dict[str, Any] = {
-            "type": "postmortem_published",
-            "artifact_ids.jira": ticket_id,
+            "type": "postmortem_created",
+            "$or": [
+                {"artifact_ids.ticket": ticket_id},
+                {"artifact_ids.jira": ticket_id},
+            ],
         }
         if iso:
             pm_filter["timestamp"] = {"$lte": iso}
@@ -1656,17 +1675,18 @@ class Memory:
     def log_slack_messages(
         self, channel: str, messages: List[Dict], export_dir: Path
     ) -> Tuple[str, str]:
-        """Batch saves Slack messages to JSON files and MongoDB."""
+        """Batch saves messaging-platform messages to JSON files and MongoDB."""
         if not messages:
             return ("", "")
 
+        from config_loader import MSG_EXPORT_DIR
         date_str = messages[0].get("date")
-        thread_id = f"slack_{channel}_{messages[0].get('ts', datetime.now(timezone.utc).isoformat())}"
+        thread_id = f"{MSG_EXPORT_DIR}_{channel}_{messages[0].get('ts', datetime.now(timezone.utc).isoformat())}"
 
         for m in messages:
             m["thread_id"] = thread_id
 
-        channel_dir = export_dir / "slack" / "channels" / channel
+        channel_dir = export_dir / MSG_EXPORT_DIR / "channels" / channel
         channel_dir.mkdir(parents=True, exist_ok=True)
         file_path = channel_dir / f"{date_str}.json"
 
@@ -1692,7 +1712,7 @@ class Memory:
 
     def get_slack_history(self, channel: str, limit: int = 10) -> List[Dict]:
         """Retrieve recent messages for a channel."""
-        return list(self._slack.find({"channel": channel}).sort("ts", -1).limit(limit))
+        return list(self._messaging.find({"channel": channel}).sort("ts", -1).limit(limit))
 
     def get_recent_day_summaries(self, current_day: int, window: int = 7) -> List[dict]:
         """
@@ -1895,7 +1915,10 @@ class Memory:
         # ── Blocker events on this ticket ─────────────────────────────────────
         blocker_filter: Dict[str, Any] = {
             "type": "blocker_flagged",
-            "artifact_ids.jira": ticket_id,
+            "$or": [
+                {"artifact_ids.ticket": ticket_id},
+                {"artifact_ids.jira": ticket_id},
+            ],
         }
         if iso:
             blocker_filter["timestamp"] = {"$lte": iso}
@@ -1918,7 +1941,10 @@ class Memory:
         # Surfaces what has already been decided so participants don't rehash it.
         discussion_filter: Dict[str, Any] = {
             "type": {"$in": ["async_question", "design_discussion"]},
-            "artifact_ids.jira": ticket_id,
+            "$or": [
+                {"artifact_ids.ticket": ticket_id},
+                {"artifact_ids.jira": ticket_id},
+            ],
         }
         if iso:
             discussion_filter["timestamp"] = {"$lte": iso}
@@ -2014,7 +2040,10 @@ class Memory:
         # ── Blocker events on this ticket ─────────────────────────────────────────
         blocker_filter: Dict = {
             "type": "blocker_flagged",
-            "artifact_ids.jira": ticket_id,
+            "$or": [
+                {"artifact_ids.ticket": ticket_id},
+                {"artifact_ids.jira": ticket_id},
+            ],
         }
         if iso:
             blocker_filter["timestamp"] = {"$lte": iso}
@@ -2038,7 +2067,10 @@ class Memory:
         # ── Incident origin — did an incident open this ticket? ───────────────────
         incident_filter: Dict = {
             "type": "incident_opened",
-            "artifact_ids.jira": ticket_id,
+            "$or": [
+                {"artifact_ids.ticket": ticket_id},
+                {"artifact_ids.jira": ticket_id},
+            ],
         }
         if iso:
             incident_filter["timestamp"] = {"$lte": iso}
@@ -2058,7 +2090,10 @@ class Memory:
         progress_filter: Dict = {
             "type": "ticket_progress",
             "actors": assignee,
-            "artifact_ids.jira": ticket_id,
+            "$or": [
+                {"artifact_ids.ticket": ticket_id},
+                {"artifact_ids.jira": ticket_id},
+            ],
         }
         if iso:
             progress_filter["timestamp"] = {"$lte": iso}
@@ -2226,7 +2261,8 @@ class Memory:
             "type": "design_discussion",
             "$or": [
                 {"facts.participants": {"$in": actors}},  # actor overlap
-                {"artifact_ids.jira": ticket_id},  # direct ticket ref
+                {"artifact_ids.ticket": ticket_id},  # direct ticket ref (new key)
+                {"artifact_ids.jira": ticket_id},  # direct ticket ref (legacy key)
             ],
         }
         if iso:
@@ -2240,7 +2276,9 @@ class Memory:
                     "day": 1,
                     "facts.topic": 1,
                     "facts.participants": 1,
+                    "artifact_ids.messaging_thread": 1,
                     "artifact_ids.slack_thread": 1,
+                    "artifact_ids.wiki": 1,
                     "artifact_ids.confluence": 1,
                 },
             )
@@ -2267,9 +2305,9 @@ class Memory:
                     "topic": d.get("facts", {}).get("topic", ""),
                     "participants": d.get("facts", {}).get("participants", []),
                     "slack_thread_id": d.get("artifact_ids", {}).get(
-                        "slack_thread", ""
+                        "messaging_thread", d.get("artifact_ids", {}).get("slack_thread", "")
                     ),
-                    "confluence_id": d.get("artifact_ids", {}).get("confluence", ""),
+                    "confluence_id": d.get("artifact_ids", {}).get("wiki", d.get("artifact_ids", {}).get("confluence", "")),
                 }
             )
         return results

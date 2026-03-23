@@ -14,7 +14,7 @@ Three email categories, each with distinct routing and causal tracing:
   2. CUSTOMER / CLIENT INBOUND
      Arrive during business hours (09:00–16:30). Routed through the
      product gatekeeper chain:
-       customer email → Sales Slack ping → Product decision → optional JIRA
+       customer email → Sales messaging ping → Product decision → optional ticket
      ~15 % of customer emails are dropped (no action taken). These are
      logged as "email_dropped" SimEvents — an eval agent should detect the
      gap between the email artifact and the absence of any downstream work.
@@ -53,7 +53,12 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from agent_factory import make_agent
 from causal_chain_handler import CausalChainHandler
-from config_loader import COMPANY_DESCRIPTION
+from config_loader import (
+    COMPANY_DESCRIPTION,
+    MSG_PLATFORM_NAME,
+    TKT_PLATFORM_NAME,
+    TKT_EXPORT_DIR,
+)
 from crewai import Crew, Task
 from memory import Memory, SimEvent
 from insider_threat import _NullInjector
@@ -309,7 +314,7 @@ class ExternalEmailIngestor:
     def generate_business_hours(self, state) -> List[ExternalEmailSignal]:
         """
         Customer emails arriving 09:00–16:30.
-        Each non-dropped email triggers: Sales Slack ping → Product decision → optional JIRA.
+        Each non-dropped email triggers: Sales messaging ping → Product decision → optional ticket.
         Dropped emails (~15%) are logged as "email_dropped" SimEvents.
         Returns all signals (dropped + routed) for tomorrow's CrossDeptSignal extraction.
         """
@@ -387,7 +392,7 @@ class ExternalEmailIngestor:
         product_dept = next((d for d in self._leads if "product" in d.lower()), None)
         product_lead = self._leads.get(product_dept, sales_lead)
 
-        # Hop 1: Sales pings Product on Slack
+        # Hop 1: Sales pings Product on messaging platform
         thread_id = self._sales_pings_product(
             signal, sales_lead, product_lead, state, date_str
         )
@@ -427,7 +432,7 @@ class ExternalEmailIngestor:
                 summary=(
                     f"Customer email from {signal.source_name} routed: "
                     f"{sales_lead} → {product_lead}"
-                    + (" [JIRA opened]" if len(signal.causal_chain) > 2 else "")
+                    + (" [ticket opened]" if len(signal.causal_chain) > 2 else "")
                 ),
                 tags=["email", "customer", "routed", "causal_chain"],
             )
@@ -441,7 +446,7 @@ class ExternalEmailIngestor:
 
         agent = make_agent(
             role=f"{sales_lead}, Sales Lead",
-            goal="Summarise a customer email for Product on Slack.",
+            goal=f"Summarise a customer email for Product on {MSG_PLATFORM_NAME}.",
             backstory=self._persona_hint(sales_lead),
             llm=self._worker_llm,
         )
@@ -449,13 +454,13 @@ class ExternalEmailIngestor:
             description=(
                 f"You just read this email from {signal.source_name}:\n"
                 f"Subject: {signal.subject}\n{signal.full_body}\n\n"
-                f"Write a Slack message to {product_lead} (Product) that:\n"
+                f"Write a {MSG_PLATFORM_NAME} message to {product_lead} (Product) that:\n"
                 f"1. Summarises what {signal.source_name} is asking (2 sentences)\n"
                 f"2. States urgency: high / medium / low\n"
                 f"3. Ends with a concrete ask for {product_lead}\n"
                 f"Under 80 words. No bullets. Write as {sales_lead}."
             ),
-            expected_output="Slack message under 80 words.",
+            expected_output=f"{MSG_PLATFORM_NAME} message under 80 words.",
             agent=agent,
         )
         text = str(Crew(agents=[agent], tasks=[task], verbose=False).kickoff()).strip()
@@ -488,7 +493,7 @@ class ExternalEmailIngestor:
                 date=date_str,
                 actors=[sales_lead, product_lead],
                 artifact_ids={
-                    "slack_thread": thread_id,
+                    "messaging_thread": thread_id,
                     "email": signal.embed_id,
                     "source_email": signal.embed_id,
                 },
@@ -500,7 +505,7 @@ class ExternalEmailIngestor:
                     "causal_chain": signal.causal_chain.snapshot(),
                 },
                 summary=f"{sales_lead} relayed {signal.source_name} email to {product_lead} in #product",
-                tags=["customer_escalation", "slack", "causal_chain"],
+                tags=["customer_escalation", "messaging", "causal_chain"],
             )
         )
         return thread_id
@@ -514,7 +519,7 @@ class ExternalEmailIngestor:
 
         agent = make_agent(
             role=f"{product_lead}, Product Manager",
-            goal="Write a JIRA ticket from a customer complaint.",
+            goal=f"Write a {TKT_PLATFORM_NAME} ticket from a customer complaint.",
             backstory=self._persona_hint(product_lead),
             llm=self._worker_llm,
         )
@@ -522,11 +527,11 @@ class ExternalEmailIngestor:
             description=(
                 f"You are {product_lead}. Customer {signal.source_name} emailed:\n"
                 f"Subject: {signal.subject}\n{signal.full_body}\n\n"
-                f"Write a JIRA description under 80 words covering:\n"
+                f"Write a {TKT_PLATFORM_NAME} description under 80 words covering:\n"
                 f"  - The customer issue\n  - Customer name + urgency\n"
                 f"  - One acceptance criterion\nNo preamble."
             ),
-            expected_output="JIRA description under 80 words.",
+            expected_output=f"{TKT_PLATFORM_NAME} description under 80 words.",
             agent=agent,
         )
         description = str(
@@ -551,7 +556,7 @@ class ExternalEmailIngestor:
         self._mem.upsert_ticket(ticket)
         self._mem.embed_artifact(
             id=ticket_id,
-            type="jira",
+            type="ticket",
             title=ticket["title"],
             content=json.dumps(ticket),
             day=state.day,
@@ -565,12 +570,12 @@ class ExternalEmailIngestor:
         )
         self._mem.log_event(
             SimEvent(
-                type="jira_ticket_created",
+                type="ticket_created",
                 timestamp=jira_time.isoformat(),
                 day=state.day,
                 date=date_str,
                 actors=[product_lead],
-                artifact_ids={"jira": ticket_id, "source_email": signal.embed_id},
+                artifact_ids={"ticket": ticket_id, "source_email": signal.embed_id},
                 facts={
                     "title": ticket["title"],
                     "source": "customer_email",
@@ -578,7 +583,7 @@ class ExternalEmailIngestor:
                     "causal_chain": signal.causal_chain.snapshot(),
                 },
                 summary=f"{product_lead} opened {ticket_id} from {signal.source_name} email",
-                tags=["jira", "customer", "causal_chain"],
+                tags=["ticket", "customer", "causal_chain"],
             )
         )
         logger.info(
@@ -676,7 +681,7 @@ class ExternalEmailIngestor:
         self._mem.upsert_ticket(ticket)
         self._mem.embed_artifact(
             id=ticket_id,
-            type="jira",
+            type="ticket",
             title=ticket["title"],
             content=json.dumps(ticket),
             day=state.day,
@@ -686,12 +691,12 @@ class ExternalEmailIngestor:
         )
         self._mem.log_event(
             SimEvent(
-                type="jira_ticket_created",
+                type="ticket_created",
                 timestamp=jira_time.isoformat(),
                 day=state.day,
                 date=date_str,
                 actors=[assignee],
-                artifact_ids={"jira": ticket_id, "source_email": signal.embed_id},
+                artifact_ids={"ticket": ticket_id, "source_email": signal.embed_id},
                 facts={
                     "title": ticket["title"],
                     "source": "vendor_email",
@@ -699,7 +704,7 @@ class ExternalEmailIngestor:
                     "causal_chain": signal.causal_chain.snapshot(),
                 },
                 summary=f"{assignee} opened {ticket_id} from {signal.source_name} alert",
-                tags=["jira", "vendor", "causal_chain"],
+                tags=["ticket", "vendor", "causal_chain"],
             )
         )
         logger.info(

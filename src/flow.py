@@ -27,6 +27,12 @@ from config_loader import (
     _PRESET,
     _PROVIDER,
     resolve_role,
+    MSG_PLATFORM_NAME,
+    MSG_CHANNEL_LABEL,
+    MSG_THREAD_LABEL,
+    TKT_PLATFORM_NAME,
+    TKT_EXPORT_DIR,
+    WIKI_PLATFORM_NAME,
 )
 
 import os
@@ -849,7 +855,7 @@ class Flow(Flow[State]):
             prefix=tech_cfg.get("id_prefix", "CONF-ENG").replace("CONF-", ""),
             count=tech_cfg.get("count", 3),
             prompt_tpl=(
-                "You are {author}. Write a single Confluence page with ID {id} for {company} "
+                "You are {author}. Write a single wiki page with ID {id} for {company} "
                 "about {project_name} and {legacy_system}. "
                 "Existing related pages you may reference: {related_pages}. "
                 "Use only the following canonical tech stack — never invent or substitute alternatives:\n{tech_stack}\n"
@@ -866,7 +872,7 @@ class Flow(Flow[State]):
             prefix=biz_cfg.get("id_prefix", "CONF-MKT").replace("CONF-", ""),
             count=biz_cfg.get("count", 2),
             prompt_tpl=(
-                "You are {author}. Write a single Confluence page with ID {id} for {company} "
+                "You are {author}. Write a single wiki page with ID {id} for {company} "
                 "about {product_page} campaign planning and go-to-market strategy. "
                 "Existing related pages you may reference: {related_pages}. "
                 "Output only Markdown. Do not include an author block, contributor list, "
@@ -1241,12 +1247,12 @@ class Flow(Flow[State]):
                         "updated_at": timestamp_str,
                     }
                     self._mem.upsert_ticket(ticket)
-                    save_json(f"{BASE}/jira/{tid}.json", ticket)
+                    save_json(f"{BASE}/{TKT_EXPORT_DIR}/{tid}.json", ticket)
                     self.state.sprint.tickets_in_sprint.append(tid)
                     dept_tickets.append(ticket)
                     self._embed_and_count(
                         id=tid,
-                        type="jira",
+                        type="ticket",
                         title=ticket["title"],
                         content=json.dumps(ticket),
                         day=self.state.day,
@@ -1278,12 +1284,12 @@ class Flow(Flow[State]):
         for ticket in all_new_tickets:
             self._mem.log_event(
                 SimEvent(
-                    type="jira_ticket_created",
+                    type="ticket_created",
                     day=self.state.day,
                     date=date_str,
                     timestamp=timestamp_str,
                     actors=[LEADS.get(ticket["dept"], attendees[0])],
-                    artifact_ids={"jira": ticket["id"]},
+                    artifact_ids={"ticket": ticket["id"]},
                     facts={
                         "sprint_number": sprint_num,
                         "sprint_theme": sprint_theme,
@@ -1293,7 +1299,7 @@ class Flow(Flow[State]):
                         "status": "To Do",
                     },
                     summary=f"[{ticket['id']}] {ticket['title']} ({ticket['dept']})",
-                    tags=["jira", "sprint_backlog", ticket["dept"].lower()],
+                    tags=["ticket", "sprint_backlog", ticket["dept"].lower()],
                 )
             )
 
@@ -1304,7 +1310,7 @@ class Flow(Flow[State]):
                 date=date_str,
                 timestamp=timestamp_str,
                 actors=attendees,
-                artifact_ids={"jira_tickets": [t["id"] for t in all_new_tickets]},
+                artifact_ids={"tickets": [t["id"] for t in all_new_tickets]},
                 facts={
                     "sprint_number": sprint_num,
                     "sprint_theme": sprint_theme,
@@ -1389,14 +1395,14 @@ class Flow(Flow[State]):
                     f"{owned_str}\n\n"
                     f"RULE: Only reference tickets from your assigned list above. "
                     f"Do not mention tickets owned by other people.\n\n"
-                    f"Write your Slack update in 1-3 sentences. "
+                    f"Write your {MSG_PLATFORM_NAME} update in 1-3 sentences. "
                     f"Use your typing quirks. Reflect your current stress and mood. "
                     f"Output the message only — no name prefix, no label.\n\n"
                     f"--- YOUR RECENT CONTEXT ---\n"
                     f"{personal_ctx}"
                 ),
                 expected_output=(
-                    "A single Slack message, 1-3 sentences, no name prefix, no preamble."
+                    f"A single {MSG_PLATFORM_NAME} message, 1-3 sentences, no name prefix, no preamble."
                 ),
                 agent=standup_agent,
             )
@@ -1430,7 +1436,7 @@ class Flow(Flow[State]):
             full_transcript = "\n".join(f"{m['user']}: {m['text']}" for m in messages)
             self._embed_and_count(
                 id=thread_id,
-                type="slack_thread",
+                type="messaging_thread",
                 title=f"Standup Day {self.state.day}",
                 content=full_transcript,
                 day=self.state.day,
@@ -1450,7 +1456,7 @@ class Flow(Flow[State]):
                 day=self.state.day,
                 date=date_str,
                 actors=attendees,
-                artifact_ids={"slack_path": slack_path, "slack_thread": thread_id},
+                artifact_ids={"messaging_path": slack_path, "messaging_thread": thread_id},
                 facts={"attendee_count": len(messages)},
                 summary=f"Standup: {len(messages)} voices shared updates.",
                 tags=["standup"],
@@ -1528,7 +1534,7 @@ class Flow(Flow[State]):
             scrum_master: (
                 "Scrum Master",
                 f"You have heard from engineering and product. Now synthesize their input "
-                f"into a Confluence retrospective document ({conf_id}) for Sprint #{sprint_num}.\n\n"
+                f"into a {WIKI_PLATFORM_NAME} retrospective document ({conf_id}) for Sprint #{sprint_num}.\n\n"
                 f"Sections:\n"
                 f"## What Went Well\n"
                 f"## What Didn't\n"
@@ -1578,7 +1584,7 @@ class Flow(Flow[State]):
 
         self._embed_and_count(
             id=conf_id,
-            type="confluence",
+            type="wiki",
             title=f"Retro Sprint #{sprint_num}",
             content=content,
             day=self.state.day,
@@ -1593,7 +1599,7 @@ class Flow(Flow[State]):
                 day=self.state.day,
                 date=date_str,
                 actors=attendees,
-                artifact_ids={"confluence": conf_id},
+                artifact_ids={"wiki": conf_id},
                 facts={
                     "sprint_number": sprint_num,
                     "system_health": self.state.system_health,
@@ -1727,7 +1733,7 @@ class Flow(Flow[State]):
         prior = self._recurrence_detector.find_prior_incident(
             root_cause, self.state.day, ticket_id
         )
-        recurrence_of = prior.artifact_ids.get("jira") if prior else None
+        recurrence_of = prior.artifact_ids.get("ticket", prior.artifact_ids.get("jira")) if prior else None
         recurrence_gap = (self.state.day - prior.day) if prior else None
         prior_postmortem = (
             self._recurrence_detector.find_postmortem_for_ticket(recurrence_of)
@@ -1822,7 +1828,7 @@ class Flow(Flow[State]):
                     e
                     for e in self._mem._event_log
                     if e.type == "incident_opened"
-                    and e.artifact_ids.get("jira") == _cursor
+                    and (e.artifact_ids.get("ticket") or e.artifact_ids.get("jira")) == _cursor
                     and e.facts.get("recurrence_of")
                 ),
                 None,
@@ -1863,7 +1869,7 @@ class Flow(Flow[State]):
         }
 
         self._mem.upsert_ticket(ticket)
-        save_json(f"{BASE}/jira/{ticket_id}.json", ticket)
+        save_json(f"{BASE}/{TKT_EXPORT_DIR}/{ticket_id}.json", ticket)
 
         # ── 9. Embed — now maximally rich, called last ────────────────────────
         embed_content = "\n\n".join(
@@ -1884,7 +1890,7 @@ class Flow(Flow[State]):
 
         self._embed_and_count(
             id=ticket_id,
-            type="jira",
+            type="ticket",
             title=title,
             content=embed_content,
             day=self.state.day,
@@ -2053,7 +2059,7 @@ class Flow(Flow[State]):
                         t.setdefault("linked_prs", []).append(pr["pr_id"])
                     t["updated_at"] = cron_time_iso
                     self._mem.upsert_ticket(t)
-                    save_json(f"{BASE}/jira/{inc.ticket_id}.json", t)
+                    save_json(f"{BASE}/{TKT_EXPORT_DIR}/{inc.ticket_id}.json", t)
 
                 self._emit_bot_message(
                     "engineering",
@@ -2071,7 +2077,7 @@ class Flow(Flow[State]):
                         t["causal_chain"] = inc.causal_chain.snapshot()
                         t["updated_at"] = cron_time_iso
                         self._mem.upsert_ticket(t)
-                        save_json(f"{BASE}/jira/{inc.ticket_id}.json", t)
+                        save_json(f"{BASE}/{TKT_EXPORT_DIR}/{inc.ticket_id}.json", t)
 
                 logger.info(
                     f"    [yellow]🔧 {inc.ticket_id}:[/yellow] {pr['pr_id']} opened."
@@ -2133,7 +2139,7 @@ class Flow(Flow[State]):
                         day=self.state.day,
                         date=str(self.state.current_date.date()),
                         actors=[on_call, eng_peer],
-                        artifact_ids={"jira": inc.ticket_id, "pr": inc.pr_id or ""},
+                        artifact_ids={"ticket": inc.ticket_id, "pr": inc.pr_id or ""},
                         facts={
                             "root_cause": inc.root_cause,
                             "duration_days": inc.days_active,
@@ -2182,7 +2188,7 @@ class Flow(Flow[State]):
                     day=self.state.day,
                     date=str(self.state.current_date.date()),
                     actors=[on_call, eng_peer],
-                    artifact_ids={"confluence": conf_id, "jira": inc.ticket_id},
+                    artifact_ids={"wiki": conf_id, "ticket": inc.ticket_id},
                     facts={
                         "causal_chain": inc.causal_chain.snapshot(),
                         "root_cause": inc.root_cause,
@@ -2212,7 +2218,7 @@ class Flow(Flow[State]):
         if thread_id:
             self._embed_and_count(
                 id=thread_id,
-                type="slack_thread",
+                type="messaging_thread",
                 title=f"Bot message in #{channel}",
                 content=text,
                 day=self.state.day,
@@ -2417,11 +2423,11 @@ class Flow(Flow[State]):
         table.add_column("Value", style="green")
         for row in [
             (
-                "Confluence Pages",
-                str(self._mem._artifacts.count_documents({"type": "confluence"})),
+                f"{WIKI_PLATFORM_NAME} Pages",
+                str(self._mem._artifacts.count_documents({"type": {"$in": ["wiki", "confluence"]}})),
             ),
-            ("JIRA Tickets", str(self._mem._jira.count_documents({}))),
-            ("Slack Threads", str(self._mem._slack.count_documents({}))),
+            (f"{TKT_PLATFORM_NAME} Tickets", str(self._mem._tickets.count_documents({}))),
+            (f"{MSG_PLATFORM_NAME} Threads", str(self._mem._messaging.count_documents({}))),
             ("Git PRs", str(self._mem._prs.count_documents({}))),
             ("Incidents Resolved", str(len(self.state.resolved_incidents))),
             ("Embedded Artifacts", str(s["artifact_count"])),
@@ -2437,10 +2443,10 @@ class Flow(Flow[State]):
         _proj = {"_id": 0, "embedding": 0}
         snapshot = {
             "confluence_pages": list(
-                self._mem._artifacts.find({"type": "confluence"}, _proj)
+                self._mem._artifacts.find({"type": {"$in": ["wiki", "confluence"]}}, _proj)
             ),
-            "jira_tickets": list(self._mem._jira.find({}, {"_id": 0})),
-            "slack_threads": list(self._mem._slack.find({}, {"_id": 0})),
+            "jira_tickets": list(self._mem._tickets.find({}, {"_id": 0})),
+            "slack_threads": list(self._mem._messaging.find({}, {"_id": 0})),
             "pr_registry": list(self._mem._prs.find({}, {"_id": 0})),
             "resolved_incidents": self.state.resolved_incidents,
             "morale_history": self.state.morale_history,
@@ -2499,7 +2505,7 @@ class Flow(Flow[State]):
 
     def _handle_external_contact(self, inc: ActiveIncident, contact: dict) -> None:
         """
-        Generates a Slack message where an employee summarizes what an
+        Generates a messaging-platform message where an employee summarizes what an
         external party (AWS, customer, vendor) communicated about an incident.
         Logs a SimEvent for ground-truth retrieval evaluation.
         """
@@ -2533,7 +2539,7 @@ class Flow(Flow[State]):
 
         agent = make_agent(
             role="Employee",
-            goal="Summarize an external conversation for your team on Slack.",
+            goal=f"Summarize an external conversation for your team on {MSG_PLATFORM_NAME}.",
             backstory=persona_backstory(
                 liaison_name,
                 self._mem,
@@ -2549,19 +2555,19 @@ class Flow(Flow[State]):
                 f"{inc.ticket_id}: {inc.root_cause}.\n"
                 f"Their tone was: {tone}.\n"
                 f"Context: {ctx}\n\n"
-                f"Write a single Slack message to your team that:\n"
+                f"Write a single {MSG_PLATFORM_NAME} message to your team that:\n"
                 f"1. Summarizes what {display_name} told you (2-3 sentences)\n"
                 f"2. Ends with one concrete action item or next step\n"
                 f"Keep it under 100 words. Do not use bullet points."
             ),
-            expected_output="A single Slack message under 100 words.",
+            expected_output=f"A single {MSG_PLATFORM_NAME} message under 100 words.",
             agent=agent,
         )
         summary_text = str(
             Crew(agents=[agent], tasks=[task], verbose=False).kickoff()
         ).strip()
 
-        # Write to the incidents Slack channel
+        # Write to the incidents messaging channel
         message = {
             "user": liaison_name,
             "email": email_of(liaison_name),
@@ -2597,9 +2603,9 @@ class Flow(Flow[State]):
                 date=date_str,
                 actors=[liaison_name, external_node],
                 artifact_ids={
-                    "slack_thread": thread_id,
-                    "slack_path": slack_path,
-                    "jira": inc.ticket_id,
+                    "messaging_thread": thread_id,
+                    "messaging_path": slack_path,
+                    "ticket": inc.ticket_id,
                 },
                 facts={
                     "external_party": display_name,
@@ -2613,14 +2619,14 @@ class Flow(Flow[State]):
                     f"{liaison_name} summarized {display_name} contact re "
                     f"{inc.ticket_id} in #incidents."
                 ),
-                tags=["external", "slack", "incident"],
+                tags=["external", "messaging", "incident"],
             )
         )
         self.state.daily_external_contacts += 1
 
         self._embed_and_count(
             id=f"ext_{external_node}_{inc.ticket_id}",
-            type="slack",
+            type="messaging_thread",
             title=f"External contact summary: {display_name} re {inc.ticket_id}",
             content=summary_text,
             day=self.state.day,

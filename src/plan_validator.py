@@ -186,7 +186,7 @@ class PlanValidator:
             # Novel events are approved if they name a known artifact type.
             # This allows the engine to generate something even without
             # a bespoke handler — it falls back to a Slack summary.
-            if event.artifact_hint in {"slack", "jira", "confluence", "email"}:
+            if event.artifact_hint in {"messaging", "ticket", "wiki", "email", "slack", "jira", "confluence"}:
                 logger.info(
                     f"  [cyan]✨ Novel event approved (fallback artifact):[/cyan] "
                     f"{event.event_type} → {event.artifact_hint}"

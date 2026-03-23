@@ -72,10 +72,17 @@ _MIN_TEXT_SCORE = 0.40
 # How many candidates to retrieve from each source before fusion
 _RETRIEVAL_LIMIT = 10
 
-ARTIFACT_KEY_JIRA = "jira"
-ARTIFACT_KEY_CONFLUENCE = "confluence"
-ARTIFACT_KEY_SLACK = "slack"
-ARTIFACT_KEY_SLACK_THREAD = "slack_thread"
+# Platform-generic artifact keys (used in SimEvent.artifact_ids dicts).
+# Legacy aliases kept for backward compat with existing MongoDB documents.
+ARTIFACT_KEY_TICKET = "ticket"
+ARTIFACT_KEY_WIKI = "wiki"
+ARTIFACT_KEY_MESSAGING = "messaging"
+ARTIFACT_KEY_MESSAGING_THREAD = "messaging_thread"
+# Backward-compat aliases
+ARTIFACT_KEY_JIRA = ARTIFACT_KEY_TICKET
+ARTIFACT_KEY_CONFLUENCE = ARTIFACT_KEY_WIKI
+ARTIFACT_KEY_SLACK = ARTIFACT_KEY_MESSAGING
+ARTIFACT_KEY_SLACK_THREAD = ARTIFACT_KEY_MESSAGING_THREAD
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CAUSAL CHAIN HANDLER
@@ -88,14 +95,14 @@ class CausalChainHandler:
     """
     Append-only causal chain for a single incident or feature thread.
 
-    The chain starts with the root artifact (usually a Jira ticket ID) and
-    grows as the incident progresses — Slack threads, PRs, postmortems are
+    The chain starts with the root artifact (usually a ticket ID) and
+    grows as the incident progresses — messaging threads, PRs, postmortems are
     appended in order. Snapshots are taken at each SimEvent so the historical
     record shows the chain as it existed at that exact moment, not retroactively.
 
     Usage:
         handler = CausalChainHandler(root_id="ORG-042")
-        handler.append("slack_incidents_2024-01-15T10:30")
+        handler.append("messaging_incidents_2024-01-15T10:30")
         handler.append("PR-117")
         handler.append("CONF-ENG-012")
 
@@ -200,7 +207,7 @@ class RecurrenceMatchStore:
             "current_day": current_day,
             # Match result
             "matched": matched_event is not None,
-            "matched_ticket_id": matched_event.artifact_ids.get("jira")
+            "matched_ticket_id": matched_event.artifact_ids.get("ticket", matched_event.artifact_ids.get("jira"))
             if matched_event
             else None,
             "matched_root_cause": matched_event.facts.get("root_cause")
@@ -305,7 +312,7 @@ class RecurrenceDetector:
         _TEXT_CEILING = 8.0
         for rank, result in enumerate(text_results):
             event = SimEvent.from_dict(result)
-            key = event.artifact_ids.get("jira", event.timestamp)
+            key = event.artifact_ids.get("ticket", event.artifact_ids.get("jira", event.timestamp))
             raw = result.get("score", 0)
             normalised = round(min(raw / _TEXT_CEILING, 1.0), 4)
             candidates.setdefault(key, self._empty_candidate(event))
@@ -316,7 +323,7 @@ class RecurrenceDetector:
         vector_results = self._vector_search(root_cause, current_day)
 
         for rank, (event, vscore) in enumerate(vector_results):
-            key = event.artifact_ids.get("jira", event.timestamp)
+            key = event.artifact_ids.get("ticket", event.artifact_ids.get("jira", event.timestamp))
             candidates.setdefault(key, self._empty_candidate(event))
             candidates[key]["vector_score"] = vscore
             candidates[key]["vector_rrf"] = 1 / (rank + 1 + _RRF_K)
@@ -414,7 +421,7 @@ class RecurrenceDetector:
 
         logger.info(
             f"[causal_chain] Recurrence matched ({confidence}): "
-            f"{best['event'].artifact_ids.get('jira', '?')} "
+            f"{best['event'].artifact_ids.get('ticket', best['event'].artifact_ids.get('jira', '?'))} "
             f"(vector={best['vector_score']:.3f}, "
             f"text={best['text_score']:.3f}, "
             f"gap={current_day - best['event'].day}d)"
@@ -432,11 +439,11 @@ class RecurrenceDetector:
                 e
                 for e in self._mem.get_event_log()
                 if e.type == "postmortem_created"
-                and e.artifact_ids.get("jira") == ticket_id
+                and (e.artifact_ids.get("ticket") or e.artifact_ids.get("jira")) == ticket_id
             ),
             None,
         )
-        return event.artifact_ids.get("confluence") if event else None
+        return event.artifact_ids.get("wiki", event.artifact_ids.get("confluence")) if event else None
 
     def get_causal_chain(self, artifact_id: str) -> List[SimEvent]:
         """
