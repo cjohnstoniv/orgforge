@@ -23,7 +23,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, asdict
 import time
-from typing import List, Dict, Optional, Any, Tuple
+from typing import List, Dict, Optional, Any, Tuple, Union
 
 from pymongo import MongoClient
 from pymongo.operations import SearchIndexModel
@@ -588,7 +588,7 @@ class Memory:
         self,
         query: str,
         n: int = 5,
-        type_filter: Optional[str] = None,
+        type_filter: Optional[Union[str, List[str]]] = None,
         type_exclude: Optional[List[str]] = None,
         day_range: Optional[tuple] = None,
         since: Optional[Any] = None,
@@ -625,7 +625,10 @@ class Memory:
                 "recall(): type_filter and type_exclude are mutually exclusive"
             )
         if type_filter:
-            filter_doc["type"] = {"$eq": type_filter}
+            if isinstance(type_filter, list):
+                filter_doc["type"] = {"$in": type_filter}
+            else:
+                filter_doc["type"] = {"$eq": type_filter}
         if type_exclude:
             filter_doc["type"] = {"$nin": type_exclude}
         if day_range:
@@ -725,7 +728,7 @@ class Memory:
         results = self.recall(
             query=topic,
             n=n,
-            type_filter="wiki",
+            type_filter=["wiki", "confluence"],
             as_of_time=as_of_time,
         )
 

@@ -31,6 +31,7 @@ from config_loader import (
     MSG_CHANNEL_LABEL,
     MSG_THREAD_LABEL,
     TKT_PLATFORM_NAME,
+    TKT_EXPORT_DIR,
     WIKI_PLATFORM_NAME,
 )
 
@@ -1246,7 +1247,7 @@ class Flow(Flow[State]):
                         "updated_at": timestamp_str,
                     }
                     self._mem.upsert_ticket(ticket)
-                    save_json(f"{BASE}/jira/{tid}.json", ticket)
+                    save_json(f"{BASE}/{TKT_EXPORT_DIR}/{tid}.json", ticket)
                     self.state.sprint.tickets_in_sprint.append(tid)
                     dept_tickets.append(ticket)
                     self._embed_and_count(
@@ -1868,7 +1869,7 @@ class Flow(Flow[State]):
         }
 
         self._mem.upsert_ticket(ticket)
-        save_json(f"{BASE}/jira/{ticket_id}.json", ticket)
+        save_json(f"{BASE}/{TKT_EXPORT_DIR}/{ticket_id}.json", ticket)
 
         # ── 9. Embed — now maximally rich, called last ────────────────────────
         embed_content = "\n\n".join(
@@ -2058,7 +2059,7 @@ class Flow(Flow[State]):
                         t.setdefault("linked_prs", []).append(pr["pr_id"])
                     t["updated_at"] = cron_time_iso
                     self._mem.upsert_ticket(t)
-                    save_json(f"{BASE}/jira/{inc.ticket_id}.json", t)
+                    save_json(f"{BASE}/{TKT_EXPORT_DIR}/{inc.ticket_id}.json", t)
 
                 self._emit_bot_message(
                     "engineering",
@@ -2076,7 +2077,7 @@ class Flow(Flow[State]):
                         t["causal_chain"] = inc.causal_chain.snapshot()
                         t["updated_at"] = cron_time_iso
                         self._mem.upsert_ticket(t)
-                        save_json(f"{BASE}/jira/{inc.ticket_id}.json", t)
+                        save_json(f"{BASE}/{TKT_EXPORT_DIR}/{inc.ticket_id}.json", t)
 
                 logger.info(
                     f"    [yellow]🔧 {inc.ticket_id}:[/yellow] {pr['pr_id']} opened."
