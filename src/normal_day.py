@@ -1415,7 +1415,10 @@ class NormalDayHandler:
             prior = self._mem._events.find_one(
                 {
                     "type": "ticket_progress",
-                    "artifact_ids.jira": ticket_id,
+                    "$or": [
+                        {"artifact_ids.ticket": ticket_id},
+                        {"artifact_ids.jira": ticket_id},
+                    ],
                     "facts.causal_chain": {"$exists": True},
                 },
                 {"facts.causal_chain": 1, "_id": 0},
@@ -2023,7 +2026,10 @@ class NormalDayHandler:
                 prior = self._mem._events.find_one(
                     {
                         "type": "ticket_progress",
-                        "artifact_ids.jira": ticket_id,
+                        "$or": [
+                            {"artifact_ids.ticket": ticket_id},
+                            {"artifact_ids.jira": ticket_id},
+                        ],
                         "facts.causal_chain": {"$exists": True},
                     },
                     {"facts.causal_chain": 1, "_id": 0},

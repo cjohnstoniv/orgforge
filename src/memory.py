@@ -2254,7 +2254,9 @@ class Memory:
                     "day": 1,
                     "facts.topic": 1,
                     "facts.participants": 1,
+                    "artifact_ids.messaging_thread": 1,
                     "artifact_ids.slack_thread": 1,
+                    "artifact_ids.wiki": 1,
                     "artifact_ids.confluence": 1,
                 },
             )
