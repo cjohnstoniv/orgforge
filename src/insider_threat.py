@@ -2489,7 +2489,7 @@ class InsiderThreatInjector:
                 timestamp=send_ts.isoformat(),
                 actor=subject.name,
                 details={
-                    "pattern": "slack_pretexting",
+                    "pattern": "messaging_pretexting",
                     "target": target,
                     "channel": "direct-messages",
                     "send_hour": send_hour,
