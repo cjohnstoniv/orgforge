@@ -153,7 +153,7 @@ class GraphDynamics:
         return "critically high"
 
     def stress_tone_hint(self, name: str) -> str:
-        """One-sentence LLM directive that colours a person's Slack/email voice."""
+        """One-sentence LLM directive that colours a person's messaging/email voice."""
         s = self._stress.get(name, 30)
         if s < 35:
             return f"{name} is in a good headspace today -- helpful and upbeat."
@@ -171,8 +171,8 @@ class GraphDynamics:
 
     # ── 2. TEMPORAL EDGE-WEIGHT DYNAMICS ─────────────────────────────────────
 
-    def record_slack_interaction(self, participants: List[str]) -> None:
-        """Boost edges for all pairs in a Slack thread. Call end of _handle_normal_day()."""
+    def record_messaging_interaction(self, participants: List[str]) -> None:
+        """Boost edges for all pairs in a messaging thread. Call end of _handle_normal_day()."""
         self._boost_pairs(participants, self.cfg["slack_boost"])
 
     def record_pr_review(self, author: str, reviewers: List[str]) -> None:

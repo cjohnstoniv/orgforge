@@ -55,6 +55,12 @@ EMBED_DIMS = int(os.environ.get("EMBED_DIMS", "1024"))
 DEBUG_TOKEN_TRACKING = os.environ.get("DEBUG_TOKEN_TRACKING", "false").lower() == "true"
 
 _SKIP_EMBED_TYPES = {
+    "ticket_created",
+    "ticket_updated",
+    "wiki_page_created",
+    "messaging_thread_created",
+    "messaging_message_sent",
+    # Legacy aliases (keep for backward compat with existing DBs)
     "jira_ticket_created",
     "jira_ticket_updated",
     "confluence_page_created",
@@ -390,10 +396,17 @@ class Memory:
         self._token_usage = self._db["token_usage"] if self._debug_tokens else None
         self._artifacts = self._db["artifacts"]
         self._events = self._db["events"]
-        self._jira = self._db["jira_tickets"]
+        # Platform-aware collection names — driven by config.yaml platform section.
+        # Import here to avoid circular imports at module level.
+        from config_loader import MSG_COLLECTION, TKT_COLLECTION
+        self._tickets = self._db[TKT_COLLECTION]
         self._prs = self._db["pull_requests"]
         self._checkpoints = self._db["checkpoints"]
-        self._slack = self._db["slack_messages"]
+        self._messaging = self._db[MSG_COLLECTION]
+        # Backward-compat aliases so existing callers using self._jira / self._slack
+        # continue to work without changes.
+        self._jira = self._tickets
+        self._slack = self._messaging
         self._plans = self._db["dept_plans"]
         self._conversation_summaries = self._db["conversation_summaries"]
 
@@ -1656,17 +1669,18 @@ class Memory:
     def log_slack_messages(
         self, channel: str, messages: List[Dict], export_dir: Path
     ) -> Tuple[str, str]:
-        """Batch saves Slack messages to JSON files and MongoDB."""
+        """Batch saves messaging-platform messages to JSON files and MongoDB."""
         if not messages:
             return ("", "")
 
+        from config_loader import MSG_EXPORT_DIR
         date_str = messages[0].get("date")
-        thread_id = f"slack_{channel}_{messages[0].get('ts', datetime.now(timezone.utc).isoformat())}"
+        thread_id = f"{MSG_EXPORT_DIR}_{channel}_{messages[0].get('ts', datetime.now(timezone.utc).isoformat())}"
 
         for m in messages:
             m["thread_id"] = thread_id
 
-        channel_dir = export_dir / "slack" / "channels" / channel
+        channel_dir = export_dir / MSG_EXPORT_DIR / "channels" / channel
         channel_dir.mkdir(parents=True, exist_ok=True)
         file_path = channel_dir / f"{date_str}.json"
 
@@ -1692,7 +1706,7 @@ class Memory:
 
     def get_slack_history(self, channel: str, limit: int = 10) -> List[Dict]:
         """Retrieve recent messages for a channel."""
-        return list(self._slack.find({"channel": channel}).sort("ts", -1).limit(limit))
+        return list(self._messaging.find({"channel": channel}).sort("ts", -1).limit(limit))
 
     def get_recent_day_summaries(self, current_day: int, window: int = 7) -> List[dict]:
         """

@@ -119,7 +119,13 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
-from config_loader import COMPANY_DESCRIPTION, COMPANY_NAME
+from config_loader import (
+    COMPANY_DESCRIPTION,
+    COMPANY_NAME,
+    MSG_PLATFORM_NAME,
+    TKT_PLATFORM_NAME,
+    WIKI_PLATFORM_NAME,
+)
 
 logger = logging.getLogger("orgforge.security")
 
@@ -1059,7 +1065,7 @@ class InsiderThreatInjector:
             pattern = random.choice(
                 [
                     "spear_phishing",
-                    "slack_pretexting",
+                    "messaging_pretexting",
                     "vishing_breadcrumb",
                     "trust_building",
                 ]
@@ -1070,7 +1076,7 @@ class InsiderThreatInjector:
                     subject, target, day, current_date, date_str
                 )
 
-            elif pattern == "slack_pretexting":
+            elif pattern == "messaging_pretexting":
                 result = self._inject_slack_pretext(
                     subject, target, day, current_date, date_str
                 )
@@ -1095,7 +1101,7 @@ class InsiderThreatInjector:
 
         return injected
 
-    # ─── SLACK INJECTION ─────────────────────────────────────────────────────
+    # ─── MESSAGING INJECTION ────────────────────────────────────────────────
 
     def inject_slack(
         self,
@@ -1105,7 +1111,7 @@ class InsiderThreatInjector:
         current_date: datetime,
     ) -> List[dict]:
         """
-        Called after a Slack message list is assembled but before it is
+        Called after a messaging message list is assembled but before it is
         written to Memory.  May:
         - Mutate an existing message (sentiment_drift)
         - Append an anomalous message (unusual_hours_access)
@@ -1205,8 +1211,8 @@ class InsiderThreatInjector:
                     "thread_ts": off_hours_ts.isoformat(),
                     "day": day,
                     # Flag that this message was injected outside business hours.
-                    # Stored in the Slack artifact metadata — NOT in the message text.
-                    # Detection agents reading raw Slack JSON will see this field;
+                    # Stored in the messaging artifact metadata — NOT in the message text.
+                    # Detection agents reading raw message JSON will see this field;
                     # agents reading only message content will miss it.
                     "_security_injected": True,
                     "is_bot": False,
@@ -1346,7 +1352,7 @@ class InsiderThreatInjector:
         )
         return exfil_path
 
-    # ─── JIRA / CROSS-DEPT SNOOPING ──────────────────────────────────────────
+    # ─── TICKET / CROSS-DEPT SNOOPING ────────────────────────────────────────
 
     def inject_jira_access(
         self,
@@ -1694,7 +1700,7 @@ class InsiderThreatInjector:
 
         The anomalous IDP events are the foundation for authentication anomaly
         detection scenarios:
-          - Employee logs in at 02:00 but no Slack/email/Jira activity follows
+          - Employee logs in at 02:00 but no messaging/email/ticket activity follows
           - Employee logs in from an unrecognized device or unusual geo
           - Employee authenticates via a method they have never used before
         """
@@ -1969,7 +1975,7 @@ class InsiderThreatInjector:
         onset_day: int = 0,
     ) -> str:
         """
-        Rewrites a Slack message to reflect the subject\'s emotional state
+        Rewrites a messaging-platform message to reflect the subject\'s emotional state
         using a CrewAI Task so the output is authentically human-sounding.
 
         Disgruntled → progressive negativity keyed to days_since_onset:
@@ -2003,7 +2009,7 @@ class InsiderThreatInjector:
                 else "pronounced"
             )
             prompt = (
-                f"Rewrite this Slack message as if sent by a {intensity}ly disgruntled "
+                f"Rewrite this {MSG_PLATFORM_NAME} message as if sent by a {intensity}ly disgruntled "
                 f"employee who is losing faith in their team and feeling undervalued. "
                 f"The tone must feel authentically human — not theatrical or melodramatic. "
                 f"Guidelines by intensity:\\n"
@@ -2023,7 +2029,7 @@ class InsiderThreatInjector:
 
         elif threat_class == "malicious":
             prompt = (
-                f"Rewrite this Slack message as if sent by an employee who is secretly "
+                f"Rewrite this {MSG_PLATFORM_NAME} message as if sent by an employee who is secretly "
                 f"planning to exfiltrate data and leave, but is actively performing "
                 f"normalcy to avoid detection. "
                 f"Malicious insiders overcorrect: they are slightly too helpful, too "
@@ -2044,7 +2050,7 @@ class InsiderThreatInjector:
 
             agent = make_agent(
                 role="Employee",
-                goal="Send a Slack message that reflects your current emotional state.",
+                goal=f"Send a {MSG_PLATFORM_NAME} message that reflects your current emotional state.",
                 backstory=self._persona_helper(
                     name,
                     None,
@@ -2059,7 +2065,7 @@ class InsiderThreatInjector:
             task = Task(
                 description=prompt,
                 expected_output=(
-                    "A single rewritten Slack message under 120 words. "
+                    f"A single rewritten {MSG_PLATFORM_NAME} message under 120 words. "
                     "Output only the message text — no labels, no explanation, "
                     "no quotes around the message."
                 ),
@@ -2424,7 +2430,7 @@ class InsiderThreatInjector:
         date_str: str,
     ) -> Optional[Dict]:
         """
-        Appends a Slack DM to the 'direct-messages' channel impersonating IT
+        Appends a DM to the 'direct-messages' channel impersonating IT
         support.  Timed to coincide with a real incident when possible —
         that's when employees are most likely to comply with an urgent request.
 
@@ -2456,7 +2462,7 @@ class InsiderThreatInjector:
                 f"{target} — heads up, there's a payroll discrepancy for your account "
                 f"in the HR system. Finance asked me to collect your employee ID and "
                 f"last 4 of SSN to push a correction before the pay run closes. "
-                f"Sorry for the weird ask over Slack — ticketing system is down."
+                f"Sorry for the weird ask over {MSG_PLATFORM_NAME} — ticketing system is down."
             ),
         ]
 
@@ -2498,7 +2504,7 @@ class InsiderThreatInjector:
                 _behavior="social_engineering",
             )
         )
-        return {"pattern": "slack_pretexting", "target": target, "message": message}
+        return {"pattern": "messaging_pretexting", "target": target, "message": message}
 
     def _inject_vishing(
         self,

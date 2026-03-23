@@ -8,7 +8,17 @@ from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 
 from agent_factory import make_agent
-from config_loader import COMPANY_DESCRIPTION
+from config_loader import (
+    COMPANY_DESCRIPTION,
+    MSG_PLATFORM_NAME,
+    MSG_DM_LABEL,
+    MSG_CHANNEL_LABEL,
+    MSG_THREAD_LABEL,
+    MSG_EXPORT_DIR,
+    TKT_PLATFORM_NAME,
+    TKT_EXPORT_DIR,
+    WIKI_PLATFORM_NAME,
+)
 from crewai import Agent, Process, Task, Crew
 
 from memory import Memory, SimEvent
@@ -370,7 +380,7 @@ class NormalDayHandler:
         elif t == "code_review_comment":
             return self._handle_pr_review(eng_plan, item, date_str)
         else:
-            # Unknown activity type — generate a generic Slack message
+            # Unknown activity type — generate a generic messaging message
             return self._handle_generic_activity(eng_plan, item, date_str)
 
     # ─── ACTIVITY HANDLERS ───────────────────────────────────────────────────
@@ -381,7 +391,7 @@ class NormalDayHandler:
         item: AgendaItem,
         date_str: str,
     ) -> List[str]:
-        """Simulates an engineer working on a specific JIRA ticket and potentially opening a PR."""
+        """Simulates an engineer working on a specific ticket and potentially opening a PR."""
 
         assignee = eng_plan.name
         ticket_id = item.related_id
@@ -440,7 +450,7 @@ class NormalDayHandler:
                 f"Respond ONLY with valid JSON. No preamble, no markdown fences.\n"
                 f"{{\n"
                 f'  "comment": "string — 1-3 sentences describing what you did today, '
-                f'written as a JIRA comment in your own voice",\n'
+                f'written as a ticket comment in your own voice",\n'
                 f'  "is_code_complete": boolean — true only if the full coding phase '
                 f"is finished (false on day 1 of a complex ticket)\n"
                 f"}}\n\n"
@@ -488,7 +498,7 @@ class NormalDayHandler:
                     artifact_ids={"jira": ticket_id},
                     facts={"ticket_id": ticket_id, "comment": comment_text},
                     summary=f"{assignee} flagged a blocker on {ticket_id}.",
-                    tags=["jira", "blocker"],
+                    tags=["ticket", "blocker"],
                 )
             )
 
@@ -629,7 +639,7 @@ class NormalDayHandler:
                 facts=facts,
                 summary=f"{assignee} worked on {ticket_id}. "
                 + (f"Opened PR {spawned_pr_id}!" if spawned_pr_id else ""),
-                tags=["jira", "engineering"],
+                tags=["ticket", "engineering"],
             )
         )
 
@@ -653,7 +663,7 @@ class NormalDayHandler:
     ) -> List[str]:
         """
         Engineer reviews a PR.
-        Generates: GitHub review comment thread in Slack #engineering.
+        Generates: GitHub review comment thread in messaging #engineering.
         """
         reviewer = eng_plan.name
         pr_id = item.related_id
@@ -1075,7 +1085,7 @@ class NormalDayHandler:
     ) -> List[str]:
         """
         Engineer has a 1:1 with their lead or a collaborator.
-        Generates: DM thread (2-4 messages).
+        Generates: direct message thread (2-4 messages).
         """
         name = eng_plan.name
         collaborator = next(iter(item.collaborator), None) or self._find_lead_for(name)
@@ -1126,7 +1136,7 @@ class NormalDayHandler:
 
             if i == 0:
                 base_desc = (
-                    f"You are {speaker}. You are in a private Slack DM with {other}.\n\n"
+                    f"You are {speaker}. You are in a private {MSG_DM_LABEL} with {other}.\n\n"
                     f"Both of you:\n{voice_cards}\n\n"
                     f"Context: {ctx}\n\n"
                     f"Open the conversation. Topics might include workload, sprint decisions, "
@@ -1219,7 +1229,7 @@ class NormalDayHandler:
                     "message_count": len(messages),
                 },
                 summary=f"1:1 between {name} and {collaborator}.",
-                tags=["1on1", "slack"],
+                tags=["1on1", "messaging"],
             )
         )
 
@@ -1229,7 +1239,7 @@ class NormalDayHandler:
                 full_text, [name, collaborator], self._vader
             )
 
-        self._gd.record_slack_interaction([name, collaborator])
+        self._gd.record_messaging_interaction([name, collaborator])
         logger.info(f"    [dim]👥 1:1 {name} ↔ {collaborator}[/dim]")
         return [name, collaborator]
 
@@ -1242,7 +1252,7 @@ class NormalDayHandler:
     ) -> List[str]:
         """
         Engineer asks a question in a channel.
-        Generates: Slack thread with 2-4 replies from colleagues.
+        Generates: messaging thread with 2-4 replies from colleagues.
         Uses a single-shot JSON generation to save output tokens while preserving personas.
         """
         asker = eng_plan.name
@@ -1323,16 +1333,16 @@ class NormalDayHandler:
         combined_hint = f"{doc_hint}\n\n{design_hint}" if design_hint else doc_hint
 
         agent = make_agent(
-            role="Slack Conversation Simulator",
-            goal="Write a realistic casual Slack Q&A thread between coworkers.",
-            backstory="You write authentic workplace Slack conversations that reflect each person's distinct voice, typing quirks, and current mood.",
+            role=f"{MSG_PLATFORM_NAME} Conversation Simulator",
+            goal=f"Write a realistic casual {MSG_PLATFORM_NAME} Q&A thread between coworkers.",
+            backstory=f"You write authentic workplace {MSG_PLATFORM_NAME} conversations that reflect each person's distinct voice, typing quirks, and current mood.",
             llm=self._worker,
         )
 
         task = Task(
             description=(
                 f"COMPANY CONTEXT: {self._company} which {COMPANY_DESCRIPTION}\n"
-                f"Write a full Slack thread where a colleague asks a question.\n\n"
+                f"Write a full {MSG_THREAD_LABEL} where a colleague asks a question.\n\n"
                 f"Topic: {ticket_title}\n"
                 f"Participants (Voice Cards):\n{voice_cards}\n\n"
                 f"Relevant context: {ctx}\n"
@@ -1433,7 +1443,7 @@ class NormalDayHandler:
                 },
                 facts=facts,
                 summary=f"{asker} asked a question in #{channel} about {ticket_title[:50]}.",
-                tags=["async_question", "slack"],
+                tags=["async_question", "messaging"],
             )
         )
 
@@ -1441,7 +1451,7 @@ class NormalDayHandler:
             full_text = " ".join(m["text"] for m in messages)
             self._score_and_apply_sentiment(full_text, all_actors, self._vader)
 
-        self._gd.record_slack_interaction(all_actors)
+        self._gd.record_messaging_interaction(all_actors)
         logger.info(f"    [dim]❓ {asker} → #{channel} ({len(messages)} msgs)[/dim]")
         return all_actors
 
@@ -1454,7 +1464,7 @@ class NormalDayHandler:
     ) -> List[str]:
         """
         Small group design discussion — typically 2-3 engineers.
-        Generates: Slack thread + optional Confluence stub.
+        Generates: messaging thread + optional wiki stub.
         Uses a single-shot JSON generation to save output tokens while preserving personas.
         """
         initiator = eng_plan.name
@@ -1496,16 +1506,16 @@ class NormalDayHandler:
         speaker_sequence = ", ".join(turn_speakers)
 
         agent = make_agent(
-            role="Slack Conversation Simulator",
-            goal="Write a realistic multi-turn Slack technical design discussion.",
-            backstory="You write authentic workplace Slack threads where engineers debate technical trade-offs based on their distinct personas.",
+            role=f"{MSG_PLATFORM_NAME} Conversation Simulator",
+            goal=f"Write a realistic multi-turn {MSG_PLATFORM_NAME} technical design discussion.",
+            backstory=f"You write authentic workplace {MSG_PLATFORM_NAME} threads where engineers debate technical trade-offs based on their distinct personas.",
             llm=self._planner,
         )
 
         task = Task(
             description=(
                 f"COMPANY CONTEXT: {self._company} which {COMPANY_DESCRIPTION}\n"
-                f"Write a full Slack thread for a design discussion.\n\n"
+                f"Write a full {MSG_THREAD_LABEL} for a design discussion.\n\n"
                 f"Topic: {item.description}\n"
                 f"Participants (Voice Cards):\n{voice_cards}\n\n"
                 f"Relevant context: {ctx}\n\n"
@@ -1612,11 +1622,11 @@ class NormalDayHandler:
                     f"{initiator} led design discussion on '{item.description[:80]}' "
                     f"with {', '.join(p for p in participants if p != initiator)}."
                 ),
-                tags=["design_discussion", "slack"],
+                tags=["design_discussion", "messaging"],
             )
         )
 
-        self._gd.record_slack_interaction(participants)
+        self._gd.record_messaging_interaction(participants)
         logger.info(
             f"    [dim]🏗️  Design discussion: {item.description[:80]} "
             f"({len(participants)} engineers)[/dim]"
@@ -1732,8 +1742,8 @@ class NormalDayHandler:
         )
 
         # Mentoring is a strong relationship signal
-        self._gd.record_slack_interaction([mentor, mentee])
-        self._gd.record_slack_interaction([mentor, mentee])  # double boost
+        self._gd.record_messaging_interaction([mentor, mentee])
+        self._gd.record_messaging_interaction([mentor, mentee])  # double boost
 
         self._mem.log_event(
             SimEvent(
@@ -1749,7 +1759,7 @@ class NormalDayHandler:
                     "message_count": len(messages),
                 },
                 summary=f"{mentor} mentored {mentee}.",
-                tags=["mentoring", "slack"],
+                tags=["mentoring", "messaging"],
             )
         )
 
@@ -1776,7 +1786,7 @@ class NormalDayHandler:
         return [name]
 
     def _handle_collision_event(self, event: ProposedEvent, date_str: str):
-        """Renders the unplanned cross-dept interaction as a Slack thread.
+        """Renders the unplanned cross-dept interaction as a messaging thread.
         Uses a single LLM call to generate the full conversation, giving the
         model full arc awareness so tension can escalate or resolve naturally.
         """
@@ -1828,14 +1838,14 @@ class NormalDayHandler:
         }.get(tension, "")
 
         agent = make_agent(
-            role="Slack Conversation Simulator",
-            goal="Write a realistic multi-turn Slack exchange between coworkers.",
-            backstory="You write authentic workplace Slack conversations that reflect each person's distinct voice and the emotional arc of the situation.",
+            role=f"{MSG_PLATFORM_NAME} Conversation Simulator",
+            goal=f"Write a realistic multi-turn {MSG_PLATFORM_NAME} exchange between coworkers.",
+            backstory=f"You write authentic workplace {MSG_PLATFORM_NAME} conversations that reflect each person's distinct voice and the emotional arc of the situation.",
             llm=self._planner,
         )
         task = Task(
             description=(
-                f"Write a full Slack thread between coworkers having an unplanned cross-team exchange.\n\n"
+                f"Write a full {MSG_THREAD_LABEL} between coworkers having an unplanned cross-team exchange.\n\n"
                 f"Situation: {event.rationale}\n"
                 f"Tension level: {tension}\n\n"
                 f"{tension_guidance}\n\n"
@@ -1880,7 +1890,7 @@ class NormalDayHandler:
         channel = "digital-hq"
         slack_path, thread_id = self._save_slack(messages, channel)
 
-        self._gd.record_slack_interaction(participants)
+        self._gd.record_messaging_interaction(participants)
 
         self._mem.log_event(
             SimEvent(
@@ -1906,7 +1916,7 @@ class NormalDayHandler:
         date_str: str,
         timestamp: str,
     ) -> List[str]:
-        """Short Slack exchange when an engineer is blocked.
+        """Short messaging exchange when an engineer is blocked.
         Each participant speaks in their own voice via a dedicated Agent.
         """
         from causal_chain_handler import CausalChainHandler
@@ -1937,11 +1947,11 @@ class NormalDayHandler:
                 f"You are {asker}. You are blocked on [{ticket_id}]: {ticket_title}.\n\n"
                 f"Both of you:\n{voice_cards}\n\n"
                 f"Blocker: {blocker_text[:120]}\n\n"
-                f"Post a Slack message to {collaborator} explaining the blocker. "
+                f"Post a {MSG_PLATFORM_NAME} message to {collaborator} explaining the blocker. "
                 f"Use your typing quirks and reflect your stress. "
                 f"1-2 sentences. Format: {asker}: [message]"
             ),
-            expected_output=f"One Slack message from {asker} in format: {asker}: [message]",
+            expected_output=f"One {MSG_PLATFORM_NAME} message from {asker} in format: {asker}: [message]",
             agent=asker_agent,
             context=[],
         )
@@ -1968,7 +1978,7 @@ class NormalDayHandler:
                 f"Use your typing quirks. 1-2 sentences. "
                 f"Format: {collaborator}: [message]"
             ),
-            expected_output=f"One Slack message from {collaborator} in format: {collaborator}: [message]",
+            expected_output=f"One {MSG_PLATFORM_NAME} message from {collaborator} in format: {collaborator}: [message]",
             agent=collab_agent,
             context=[asker_task],
         )
@@ -1996,7 +2006,7 @@ class NormalDayHandler:
             slack_path, thread_id = self._save_slack(
                 messages, channel, interaction_type="blocker"
             )
-            self._gd.record_slack_interaction(participants)
+            self._gd.record_messaging_interaction(participants)
 
             active_inc = next(
                 (i for i in self._state.active_incidents if i.ticket_id == ticket_id),
@@ -2043,7 +2053,7 @@ class NormalDayHandler:
                     },
                     facts=facts,
                     summary=f"{asker} is blocked on {ticket_id}, pinged {collaborator}.",
-                    tags=["slack", "blocker"],
+                    tags=["messaging", "blocker"],
                 )
             )
 
@@ -2275,14 +2285,14 @@ class NormalDayHandler:
         )
 
         agent = make_agent(
-            role="Slack Conversation Simulator",
-            goal="Write a realistic casual Slack conversation between coworkers.",
-            backstory="You write authentic workplace small-talk that reflects each person's distinct personality and current mood.",
+            role=f"{MSG_PLATFORM_NAME} Conversation Simulator",
+            goal=f"Write a realistic casual {MSG_PLATFORM_NAME} conversation between coworkers.",
+            backstory=f"You write authentic workplace small-talk that reflects each person's distinct personality and current mood.",
             llm=self._worker,
         )
         task = Task(
             description=(
-                f"Write a short casual Slack conversation between coworkers chatting about: {topic}\n\n"
+                f"Write a short casual {MSG_PLATFORM_NAME} conversation between coworkers chatting about: {topic}\n\n"
                 f"Participants (voice cards — each person's typing style and current mood):\n{voice_cards}\n\n"
                 f"Turn order: {speaker_sequence}\n\n"
                 f"Rules:\n"
@@ -2342,7 +2352,7 @@ class NormalDayHandler:
                 export_dir=Path(self._base),
             )
 
-            self._gd.record_slack_interaction(participants)
+            self._gd.record_messaging_interaction(participants)
 
             self._mem.log_event(
                 SimEvent(
@@ -2354,7 +2364,7 @@ class NormalDayHandler:
                     artifact_ids={"slack_thread": thread_id, "slack_path": slack_path},
                     facts={"topic": topic, "message_count": len(messages)},
                     summary=f"{target_actor} got distracted chatting about {topic} with {len(participants) - 1} others.",
-                    tags=["watercooler", "slack", "distraction"],
+                    tags=["watercooler", "messaging", "distraction"],
                 )
             )
 
@@ -2434,7 +2444,7 @@ class NormalDayHandler:
     def _save_slack(
         self, messages: List[dict], channel: str, interaction_type: str = "general"
     ) -> Tuple[str, str]:
-        """Write Slack messages to disk + MongoDB. Returns export path."""
+        """Write messaging-platform messages to disk + MongoDB. Returns export path."""
         date_str = str(self._state.current_date.date())
         for m in messages:
             m.setdefault("date", date_str)
@@ -2489,7 +2499,7 @@ class NormalDayHandler:
         import os
         import json as _json
 
-        path = f"{self._base}/jira/{ticket['id']}.json"
+        path = f"{self._base}/{TKT_EXPORT_DIR}/{ticket['id']}.json"
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w") as f:
             _json.dump(ticket, f, indent=2)
@@ -2587,7 +2597,7 @@ class NormalDayHandler:
         return [n for n in self._all_names if n != exclude]
 
     def graph_dynamics_record(self, participants: List[str]) -> None:
-        self._gd.record_slack_interaction(participants)
+        self._gd.record_messaging_interaction(participants)
 
     def _expertise_matched_participants(
         self,

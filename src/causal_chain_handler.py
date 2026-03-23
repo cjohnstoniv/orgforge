@@ -72,10 +72,17 @@ _MIN_TEXT_SCORE = 0.40
 # How many candidates to retrieve from each source before fusion
 _RETRIEVAL_LIMIT = 10
 
-ARTIFACT_KEY_JIRA = "jira"
-ARTIFACT_KEY_CONFLUENCE = "confluence"
-ARTIFACT_KEY_SLACK = "slack"
-ARTIFACT_KEY_SLACK_THREAD = "slack_thread"
+# Platform-generic artifact keys (used in SimEvent.artifact_ids dicts).
+# Legacy aliases kept for backward compat with existing MongoDB documents.
+ARTIFACT_KEY_TICKET = "ticket"
+ARTIFACT_KEY_WIKI = "wiki"
+ARTIFACT_KEY_MESSAGING = "messaging"
+ARTIFACT_KEY_MESSAGING_THREAD = "messaging_thread"
+# Backward-compat aliases
+ARTIFACT_KEY_JIRA = ARTIFACT_KEY_TICKET
+ARTIFACT_KEY_CONFLUENCE = ARTIFACT_KEY_WIKI
+ARTIFACT_KEY_SLACK = ARTIFACT_KEY_MESSAGING
+ARTIFACT_KEY_SLACK_THREAD = ARTIFACT_KEY_MESSAGING_THREAD
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CAUSAL CHAIN HANDLER
@@ -88,14 +95,14 @@ class CausalChainHandler:
     """
     Append-only causal chain for a single incident or feature thread.
 
-    The chain starts with the root artifact (usually a Jira ticket ID) and
-    grows as the incident progresses — Slack threads, PRs, postmortems are
+    The chain starts with the root artifact (usually a ticket ID) and
+    grows as the incident progresses — messaging threads, PRs, postmortems are
     appended in order. Snapshots are taken at each SimEvent so the historical
     record shows the chain as it existed at that exact moment, not retroactively.
 
     Usage:
         handler = CausalChainHandler(root_id="ORG-042")
-        handler.append("slack_incidents_2024-01-15T10:30")
+        handler.append("messaging_incidents_2024-01-15T10:30")
         handler.append("PR-117")
         handler.append("CONF-ENG-012")
 

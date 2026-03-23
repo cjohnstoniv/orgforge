@@ -43,6 +43,30 @@ DEFAULT_PERSONA = CONFIG["default_persona"]
 LEGACY = CONFIG["legacy_system"]
 PRODUCT_PAGE = CONFIG.get("product_page", "Product Launch")
 
+# ── Platform abstraction constants ────────────────────────────────────────────
+# These drive all user-facing platform names in LLM prompts, output paths,
+# MongoDB collection names, and SimEvent tags.
+_PLATFORM = CONFIG.get("platform", {})
+_MSG = _PLATFORM.get("messaging", {})
+_TKT = _PLATFORM.get("tickets", {})
+_WIKI = _PLATFORM.get("wiki", {})
+
+MSG_PLATFORM_NAME = _MSG.get("name", "Slack")
+MSG_DM_LABEL = _MSG.get("dm_label", "Slack DM")
+MSG_CHANNEL_LABEL = _MSG.get("channel_label", "Slack channel")
+MSG_THREAD_LABEL = _MSG.get("thread_label", "Slack thread")
+MSG_EXPORT_DIR = _MSG.get("export_dir", "slack")
+MSG_COLLECTION = _MSG.get("collection", "slack_messages")
+
+TKT_PLATFORM_NAME = _TKT.get("name", "JIRA")
+TKT_ID_PREFIX = _TKT.get("id_prefix", "JIRA")
+TKT_EXPORT_DIR = _TKT.get("export_dir", "jira")
+TKT_COLLECTION = _TKT.get("collection", "jira_tickets")
+
+WIKI_PLATFORM_NAME = _WIKI.get("name", "Confluence")
+WIKI_ID_PREFIX = _WIKI.get("id_prefix", "CONF")
+WIKI_EXPORT_DIR = _WIKI.get("export_dir", "confluence")
+
 DEPARTED_EMPLOYEES: Dict[str, Dict] = {
     gap["name"]: {
         "left": gap["left"],

@@ -1,0 +1,354 @@
+# ===================================================================
+# OrgForge -- Meridian Software (Consensus MVP)
+# ===================================================================
+# Tailored for the Consensus MVP demo environment.
+# 5 employees, 4 departments, 60 business days.
+# Platform target: Microsoft Teams / Azure DevOps / SharePoint.
+#
+# Usage:
+#   cp config/meridian_software.yaml config/config.yaml
+#   python src/flow.py
+
+# -- QUALITY PRESET ------------------------------------------------
+quality_preset: "cloud"
+
+model_presets:
+  local_cpu:
+    provider: "ollama"
+    planner: "ollama/qwen2.5:7b-instruct-q4_K_M"
+    worker: "ollama/qwen2.5:1.5b-instruct"
+    base_url: "http://localhost:11434"
+    embed_provider: "ollama"
+    embed_model: "mxbai-embed-large"
+    embed_dims: 1024
+
+  local_gpu:
+    provider: "ollama"
+    planner: "ollama/llama3.3:70b"
+    worker: "ollama/llama3.1:8b-instruct"
+    base_url: "http://localhost:11434"
+    embed_provider: "ollama"
+    embed_model: "mxbai-embed-large"
+    embed_dims: 1024
+
+  cloud:
+    provider: "bedrock"
+    planner: "bedrock/openai.gpt-oss-120b-1:0"
+    worker: "bedrock/openai.gpt-oss-120b-1:0"
+    aws_region: "us-east-2"
+    embed_provider: "ollama"
+    embed_model: "mxbai-embed-large"
+    embed_dims: 1024
+
+# -- PLATFORM ABSTRACTION ------------------------------------------
+# Targets Microsoft 365 stack for the Consensus MVP.
+platform:
+  messaging:
+    name: "Teams"
+    dm_label: "Teams chat"
+    channel_label: "Teams channel"
+    thread_label: "Teams thread"
+    export_dir: "teams"
+    collection: "teams_messages"
+  tickets:
+    name: "Azure DevOps"
+    id_prefix: "ADO"
+    export_dir: "ado"
+    collection: "ado_workitems"
+  wiki:
+    name: "SharePoint"
+    id_prefix: "SP"
+    export_dir: "sharepoint"
+
+# -- SIMULATION ----------------------------------------------------
+simulation:
+  company_name: "Meridian Software"
+  industry: "B2B SaaS"
+  company_description: >
+    builds Beacon, a real-time analytics and observability platform
+    for e-commerce companies. The team is preparing the v3.0 release
+    (alerting engine overhaul), redesigning customer onboarding, and
+    working toward SOC2 compliance.
+  domain: "meridiansoftware.io"
+  output_dir: "./export"
+  db_name: "orgforge_meridian"
+  max_days: 60
+  start_date: "2026-03-02"
+
+  adhoc_confluence_prob: 0.25
+  aws_alert_prob: 0.3
+  snyk_alert_prob: 0.15
+  sprint_tickets_per_planning: 3
+  max_incident_email_threads: 2
+  new_hire: null
+  new_hire_dept: null
+  sprint_length_days: 10
+  incident_base_prob: 0.12
+  incident_cooldown_days: 3
+
+# -- MORALE --------------------------------------------------------
+morale:
+  initial: 0.80
+  daily_decay: 0.97
+  good_day_recovery: 0.02
+  intervention_threshold: 0.55
+
+# -- LEGACY SYSTEMS ------------------------------------------------
+legacy_system:
+  name: "Beacon v2"
+  project_name: "Beacon Legacy"
+  description: "original monolithic analytics pipeline"
+  aws_alert_message: "Beacon v2 ingest pipeline latency exceeds SLA threshold."
+
+# -- GENESIS DOCUMENTS ---------------------------------------------
+genesis_docs:
+  technical:
+    count: 2
+    id_prefix: "ENG"
+  business:
+    count: 1
+    id_prefix: "BIZ"
+
+# -- SPRINT GOAL TEMPLATE -----------------------------------------
+sprint_goal_template: "Ship Beacon v3.0 alerting engine and onboarding redesign milestones"
+
+# -- SALES / CUSTOMER ACCOUNTS ------------------------------------
+sales_accounts:
+  - "ShopStream Inc"
+  - "CartAnalytics Co"
+  - "RetailPulse LLC"
+
+# -- PRODUCT PAGE NAME ---------------------------------------------
+product_page: "Beacon v3.0"
+
+# -- ROLES ---------------------------------------------------------
+roles:
+  on_call_engineer: "Engineering"
+  incident_commander: "Product"
+  hr_lead: "Customer_Success"
+  postmortem_writer: "Engineering"
+  sprint_email_sender: "Product"
+  sales_email_sender: "Customer_Success"
+  scrum_master: "Product"
+  ceo: "Engineering"
+
+# -- KNOWLEDGE GAPS ------------------------------------------------
+knowledge_gaps: []
+
+# -- ORG CHART -----------------------------------------------------
+# 5 employees across 4 departments (matching Consensus MVP spec).
+org_chart:
+  Engineering: ["Alex Chen", "Sam Patel"]
+  Product: ["Jordan Rivera"]
+  Design: ["Morgan Kim"]
+  Customer_Success: ["Casey Brooks"]
+
+leads:
+  Engineering: "Alex Chen"
+  Product: "Jordan Rivera"
+  Design: "Morgan Kim"
+  Customer_Success: "Casey Brooks"
+
+# -- ORG LIFECYCLE -------------------------------------------------
+org_lifecycle:
+  scheduled_departures: []
+  scheduled_hires: []
+  enable_random_attrition: false
+  random_attrition_daily_prob: 0.0
+
+# -- PERSONAS ------------------------------------------------------
+personas:
+  Alex Chen:
+    style: "The Technical Executive"
+    social_role: "The Strategic Decider"
+    typing_quirks: >
+      Alex writes concise, high-level messages. Uses bullet points for decisions,
+      rarely writes more than 3 sentences. Drops architectural terminology casually
+      and expects everyone to keep up. Signs off critical messages with just 'AC'.
+      Occasionally references prior decisions by date ('per our March 5 alignment').
+    anti_patterns: >
+      Never write Alex as indecisive or overly detailed. Alex doesn't explain
+      implementation specifics -- that's what Sam is for. Alex sets direction and
+      expects follow-through. Doesn't do small talk in work channels.
+    pet_peeves: "scope creep, meetings without agendas, undocumented architecture decisions"
+    stress: 45
+    expertise:
+      - "system architecture"
+      - "distributed systems"
+      - "engineering management"
+      - "cloud infrastructure"
+      - "observability"
+    tenure: "4yr"
+    is_lead: true
+    interests:
+      - "rock climbing"
+      - "home espresso brewing"
+      - "reading technical papers on weekends"
+      - "mentoring junior engineers at local meetups"
+
+  Jordan Rivera:
+    style: "The Organized Facilitator"
+    social_role: "The Alignment Seeker"
+    typing_quirks: >
+      Jordan structures everything into clear sections with headers and action items.
+      Uses @mentions deliberately to assign ownership. Always ends planning messages
+      with 'Questions? Flag by EOD.' Asks clarifying questions before committing to
+      anything -- 'Just to confirm: are we saying X or Y?' When stressed, messages
+      get shorter and more directive.
+    anti_patterns: >
+      Never write Jordan as vague about timelines or ownership. Jordan doesn't say
+      'we should probably look into this' -- Jordan says 'Sam, can you scope this
+      by Wednesday? I'll block time for review Thursday.' Jordan doesn't improvise;
+      Jordan follows the process.
+    pet_peeves: "missed standups, undefined acceptance criteria, last-minute scope changes"
+    stress: 50
+    expertise:
+      - "product management"
+      - "stakeholder communication"
+      - "roadmap planning"
+      - "OKR tracking"
+      - "agile ceremonies"
+    tenure: "3yr"
+    is_lead: true
+    interests:
+      - "trail running"
+      - "productivity systems (Notion templates)"
+      - "documentary podcasts"
+      - "weekend farmers market visits"
+
+  Sam Patel:
+    style: "The Deep Technician"
+    social_role: "The Implementation Authority"
+    typing_quirks: >
+      Sam includes code snippets in messages without apology. Uses backticks
+      constantly -- even for non-code terms like `latency` or `SLA`. Thinks
+      out loud in numbered steps and often posts a follow-up 'actually, scratch
+      step 3 -- better approach:' within minutes. References specific PRs and
+      commit hashes. Writes longer messages than anyone else on the team.
+    anti_patterns: >
+      Never write Sam as hand-wavy or high-level. Sam doesn't say 'we need
+      better performance' -- Sam says 'the P99 on /alerts is 340ms, we need
+      to get it under 200ms, I think we should add a Redis cache layer at
+      the aggregation step.' Sam doesn't defer technical decisions to Alex
+      unless it's a cross-team architectural call.
+    pet_peeves: "PRs without tests, magic numbers in code, 'it works on my machine'"
+    stress: 40
+    expertise:
+      - "backend engineering"
+      - "Python"
+      - "real-time data pipelines"
+      - "PostgreSQL"
+      - "Redis"
+      - "observability systems"
+    tenure: "2yr"
+    is_lead: false
+    interests:
+      - "competitive programming (LeetCode streaks)"
+      - "mechanical keyboards (tactile switches)"
+      - "sci-fi novels"
+      - "home automation with Raspberry Pi"
+
+  Morgan Kim:
+    style: "The User Advocate"
+    social_role: "The Empathy Bridge"
+    typing_quirks: >
+      Morgan frames everything through the user's eyes -- 'If I'm a new customer
+      seeing this for the first time...' Uses em-dashes liberally. Attaches Figma
+      links with context paragraphs explaining the design rationale. References
+      user research findings by study number. Messages have a warm, conversational
+      tone even in technical discussions. Occasionally uses a single emoji to
+      punctuate a point.
+    anti_patterns: >
+      Never write Morgan as purely technical or metrics-focused. Morgan doesn't
+      say 'the conversion rate is 3.2%' without adding 'which tells me the
+      onboarding flow is losing people at step 3.' Morgan pushes back on
+      engineering shortcuts that compromise UX, but does so diplomatically.
+    pet_peeves: "skipping user research, inconsistent design patterns, 'we'll polish it later'"
+    stress: 35
+    expertise:
+      - "UX design"
+      - "user research"
+      - "Figma"
+      - "design systems"
+      - "information architecture"
+    tenure: "2yr"
+    is_lead: true
+    interests:
+      - "watercolor painting"
+      - "UX book club"
+      - "volunteering at design bootcamps"
+      - "baking sourdough"
+
+  Casey Brooks:
+    style: "The Customer Whisperer"
+    social_role: "The Voice of the Customer"
+    typing_quirks: >
+      Casey leads with customer quotes -- 'ShopStream said yesterday...' or 'I'm
+      hearing from 3 accounts that...' Uses data to back up anecdotes. Frames
+      internal issues as customer impact: 'If v2 latency spikes again, we lose
+      the RetailPulse renewal.' Writes in a direct, slightly urgent tone. Uses
+      bold for customer names and dollar amounts at risk.
+    anti_patterns: >
+      Never write Casey as detached from business outcomes. Casey doesn't discuss
+      bugs in isolation -- Casey discusses bugs as threats to renewals. Casey
+      doesn't sugarcoat customer sentiment. If a customer is unhappy, Casey
+      says so plainly and proposes a mitigation.
+    pet_peeves: "ignoring customer feedback, slow incident response, poor release notes"
+    stress: 50
+    expertise:
+      - "customer success"
+      - "account management"
+      - "SaaS renewals"
+      - "customer onboarding"
+      - "support escalation"
+    tenure: "3yr"
+    is_lead: true
+    interests:
+      - "podcast hosting (interviewing SaaS founders)"
+      - "CrossFit"
+      - "travel photography"
+      - "board game nights"
+
+default_persona:
+  style: "The Capable Middle"
+  social_role: "The Reliable Contributor"
+  typing_quirks: >
+    Writes in complete sentences but without flair. Responds promptly, stays on topic,
+    and doesn't editorialize. Not terse, not verbose -- just clear. Occasionally asks a
+    clarifying question before acting.
+  pet_peeves: "unclear asks, last-minute scope changes"
+  stress: 45
+  expertise: ["general engineering", "cross-functional communication"]
+  tenure: "2yr"
+  is_lead: false
+
+# -- EXTERNAL CONTACTS ---------------------------------------------
+external_contacts:
+  - name: "AWS_Support"
+    display_name: "AWS Support"
+    org: "AWS"
+    role: "Support Engineer"
+    trigger_events: ["incident_opened", "fix_in_progress"]
+    trigger_health_threshold: 70
+    internal_liaison: "Engineering"
+    summary_tone: "technical and reassuring, but noncommittal about SLA"
+
+  - name: "CustomerSuccess_ShopStream"
+    display_name: "ShopStream Inc (Customer)"
+    org: "ShopStream Inc"
+    role: "VP Engineering"
+    trigger_events: ["incident_opened"]
+    trigger_health_threshold: 60
+    internal_liaison: "Customer_Success"
+    summary_tone: "concerned about uptime, asking for ETA and root cause"
+
+# -- INSIDER THREAT ------------------------------------------------
+# Disabled for the Consensus MVP -- focus is on normal corporate activity.
+insider_threat:
+  enabled: false
+  mode: "passive"
+  subjects: []
+  dlp_noise_ratio: 0.0
+  telemetry_dir: "security_telemetry"
+  log_format: "all"
+  idp_logs: false

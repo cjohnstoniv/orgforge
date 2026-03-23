@@ -47,7 +47,14 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from agent_factory import make_agent
 from causal_chain_handler import CausalChainHandler
-from config_loader import COMPANY_DESCRIPTION, PERSONAS
+from config_loader import (
+    COMPANY_DESCRIPTION,
+    MSG_PLATFORM_NAME,
+    TKT_PLATFORM_NAME,
+    TKT_EXPORT_DIR,
+    PERSONAS,
+    WIKI_PLATFORM_NAME,
+)
 from crewai import Task, Crew
 from memory import Memory, SimEvent
 from artifact_registry import ArtifactRegistry, ConfluencePage
@@ -168,14 +175,14 @@ class ConfluenceWriter:
 
             historian = make_agent(
                 role=f"{author}, {prefix} Department",
-                goal="Write one authentic internal Confluence page as yourself. Write with real insider detail.",
+                goal=f"Write one authentic internal {WIKI_PLATFORM_NAME} page as yourself. Write with real insider detail.",
                 backstory=self._persona(author, mem=self._mem, graph_dynamics=self._gd),
                 llm=self._planner,
             )
             task = Task(
                 description=prompt,
                 expected_output=(
-                    f"A single Markdown Confluence page with ID {conf_id}. "
+                    f"A single Markdown {WIKI_PLATFORM_NAME} page with ID {conf_id}. "
                     f"No separators. No preamble. "
                     f"Do not include a main # title or a metadata block at the top. "
                     f"Start directly with the first paragraph or ## section."
@@ -255,7 +262,7 @@ class ConfluenceWriter:
         )
         task = Task(
             description=(
-                f"Write a Confluence postmortem page with ID {conf_id} "
+                f"Write a {WIKI_PLATFORM_NAME} postmortem page with ID {conf_id} "
                 f"for incident {incident_id}.\n"
                 f"Title: Postmortem: {incident_title}\n"
                 f"Root Cause: {root_cause}\n"
@@ -266,7 +273,7 @@ class ConfluenceWriter:
                 f"Include: Executive Summary, Timeline, Root Cause, Impact, "
                 f"What Went Wrong, What Went Right, Action Items."
             ),
-            expected_output=f"A single Markdown postmortem page with ID {conf_id}.",
+            expected_output=f"A single Markdown {WIKI_PLATFORM_NAME} postmortem page with ID {conf_id}.",
             agent=writer,
         )
         raw = str(Crew(agents=[writer], tasks=[task], verbose=False).kickoff()).strip()
@@ -314,8 +321,8 @@ class ConfluenceWriter:
         date_str: str,
     ) -> Optional[str]:
         """
-        Generate a design doc Confluence page from a Slack discussion.
-        Also spawns 1-3 JIRA tickets from the action items in the chat.
+        Generate a design doc wiki page from a messaging-platform discussion.
+        Also spawns 1-3 tickets from the action items in the chat.
 
         Returns the registered conf_id, or None on failure.
         """
@@ -324,7 +331,7 @@ class ConfluenceWriter:
         timestamp = artifact_time.isoformat()
 
         chat_log = "\n".join(f"{m['user']}: {m['text']}" for m in slack_transcript)
-        # Tier 3: topic is a free-form Slack thread subject — HyDE rewrite
+        # Tier 3: topic is a free-form messaging thread subject — HyDE rewrite
         # produces a better embedding target than the raw topic string alone.
         ctx = self._mem.recall_with_rewrite(raw_query=topic, n=3, as_of_time=timestamp)
         related = self._registry.related_context(topic=topic, n=3)
@@ -336,17 +343,17 @@ class ConfluenceWriter:
                 author,
                 mem=self._mem,
                 graph_dynamics=self._gd,
-                extra="You just finished a Slack discussion and need to document decisions and assign follow-up work.",
+                extra=f"You just finished a {MSG_PLATFORM_NAME} discussion and need to document decisions and assign follow-up work.",
             ),
             llm=self._planner,
         )
         task = Task(
             description=(
-                f"You just had this Slack discussion about '{topic}':\n\n{chat_log}\n\n"
+                f"You just had this {MSG_PLATFORM_NAME} discussion about '{topic}':\n\n{chat_log}\n\n"
                 f"Background context: {ctx}\n"
                 f"Existing pages you may reference:\n{related}\n\n"
-                f"Write a design doc Confluence page with ID {conf_id}.\n"
-                f"Also extract 1-3 concrete next steps as JIRA ticket definitions.\n"
+                f"Write a design doc {WIKI_PLATFORM_NAME} page with ID {conf_id}.\n"
+                f"Also extract 1-3 concrete next steps as {TKT_PLATFORM_NAME} ticket definitions.\n"
                 f"Respond ONLY with valid JSON matching this exact schema:\n"
                 f"{{\n"
                 f'  "markdown_doc": "string (full Markdown, no main # title, start directly with ## Problem Statement)",\n'
@@ -451,7 +458,7 @@ class ConfluenceWriter:
         backstory: Optional[str] = None,
     ) -> None:
         """
-        Generate a character-accurate ad-hoc Confluence page.
+        Generate a character-accurate ad-hoc wiki page.
 
         Topic and ID prefix are derived from the author's persona expertise via
         a fast LLM call — no hardcoded topic lists required. The author is drawn
@@ -475,7 +482,7 @@ class ConfluenceWriter:
             (d for d, members in self._org_chart.items() if resolved_author in members),
             "ENG",
         )
-        # Map department names to short Confluence ID prefixes
+        # Map department names to short wiki ID prefixes
         _PREFIX_MAP = {
             "Engineering_Backend": "ENG",
             "Engineering_Mobile": "ENG",
@@ -545,7 +552,7 @@ class ConfluenceWriter:
                 f"EXISTING DOCUMENTATION (Do NOT duplicate or overlap significantly):\n"
                 f"{history_str}\n\n"
                 f"TASK:\n"
-                f"Based on your expertise ({expertise_str}), propose ONE specific Confluence page title "
+                f"Based on your expertise ({expertise_str}), propose ONE specific {WIKI_PLATFORM_NAME} page title "
                 f"you would plausibly write TODAY. \n\n"
                 f"Rules:\n"
                 f"- The topic MUST fall within your area of expertise ({expertise_str}). "
@@ -582,7 +589,7 @@ class ConfluenceWriter:
 
         writer_agent = make_agent(
             role="Corporate Writer",
-            goal=f"Draft a {title} Confluence page.",
+            goal=f"Draft a {title} {WIKI_PLATFORM_NAME} page.",
             backstory=self._persona(
                 resolved_author,
                 mem=self._mem,
@@ -596,7 +603,7 @@ class ConfluenceWriter:
         )
         task = Task(
             description=(
-                f"Write a single Confluence page with ID {conf_id} titled '{title}'.\n"
+                f"Write a single {WIKI_PLATFORM_NAME} page with ID {conf_id} titled '{title}'.\n"
                 f"Context from memory: {ctx}\n"
                 f"Existing pages you may reference (and ONLY these):\n{related}\n\n"
                 f"Rules:\n"
@@ -606,7 +613,7 @@ class ConfluenceWriter:
                 f"- Format as Markdown. Do not write a main # title or metadata block (like Author/Date) at the top.\n"
                 f"- Start directly with the first paragraph or ## section."
             ),
-            expected_output=f"A single Markdown Confluence page with ID {conf_id}.",
+            expected_output=f"A single Markdown {WIKI_PLATFORM_NAME} page with ID {conf_id}.",
             agent=writer_agent,
         )
         raw = str(
@@ -787,7 +794,7 @@ class ConfluenceWriter:
         date_str: str,
         timestamp: str,
     ) -> List[str]:
-        """Create JIRA tickets from a list of LLM-extracted action items."""
+        """Create tickets from a list of LLM-extracted action items."""
         created_ids: List[str] = []
         for tk in new_tickets:
             tid = self._registry.next_jira_id()
@@ -808,7 +815,7 @@ class ConfluenceWriter:
                 "updated_at": timestamp,
             }
             self._mem.upsert_ticket(ticket)
-            self._save_json(f"{self._base}/jira/{tid}.json", ticket)
+            self._save_json(f"{self._base}/{TKT_EXPORT_DIR}/{tid}.json", ticket)
             self._mem.embed_artifact(
                 id=tid,
                 type="jira",
